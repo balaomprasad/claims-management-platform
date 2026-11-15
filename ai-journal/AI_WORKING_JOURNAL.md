@@ -173,6 +173,11 @@ The browser automation had coordinate problems after viewport resizes. These wer
 - While writing the guide, the AI found that **optimistic locking has no automated test**, although it had been described as tested. The guide and this journal now say so. Its 409 mapping exists in `GlobalExceptionHandler`.
 - The dead-letter test name in the first draft of the guide was wrong; it was fixed to `ClaimEventConsumerFailureIntegrationTest`.
 
+### Follow-up: UI test scenarios
+- `docs/ui-test-scenarios.md`: 25 click-through scenarios across claimant, officer, manager, security and admin, with business explanations.
+- Labels were taken from the running UI, and the main story (report → assign → assess → request info → respond with upload → approve → settle → notifications) was clicked through in the browser.
+- **Corrected by checking:** the first draft said approving or settling above the limit shows a server error. In the UI the **Confirm** button is disabled with an "Up to …" hint, so the scenarios now describe that instead.
+
 ---
 
 ## Final reflection

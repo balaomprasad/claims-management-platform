@@ -31,6 +31,7 @@ More documentation:
 - [Database design](docs/database-design.md)
 - [Demo walkthrough](docs/walkthrough.md)
 - [Presentation guide: flows, database checks, test cases](docs/presentation-guide.md)
+- [UI test scenarios: click-through tour of every feature](docs/ui-test-scenarios.md)
 - [Architecture decision records](docs/adr)
 - [AI working journal](ai-journal/AI_WORKING_JOURNAL.md)
 
