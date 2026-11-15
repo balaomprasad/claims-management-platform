@@ -2,20 +2,22 @@ package com.claimsphere.claim.service;
 
 import com.claimsphere.claim.domain.Claim;
 import com.claimsphere.claim.domain.ClaimStatus;
-import com.claimsphere.claim.domain.ClaimStatusHistory;
 import com.claimsphere.claim.dto.ApproveClaimRequest;
+import com.claimsphere.claim.dto.AssessClaimRequest;
 import com.claimsphere.claim.dto.AssignClaimRequest;
-import com.claimsphere.claim.dto.ClaimActionRequest;
-import com.claimsphere.claim.dto.CreateClaimRequest;
-import com.claimsphere.claim.event.ClaimEvent;
+import com.claimsphere.claim.dto.SettleClaimRequest;
 import com.claimsphere.claim.event.ClaimEventType;
+import com.claimsphere.claim.repository.ClaimAssessmentRepository;
+import com.claimsphere.claim.repository.ClaimAssignmentRepository;
+import com.claimsphere.claim.repository.ClaimDecisionRepository;
+import com.claimsphere.claim.repository.ClaimInformationRequestRepository;
 import com.claimsphere.claim.repository.ClaimRepository;
-import com.claimsphere.claim.repository.ClaimStatusHistoryRepository;
-import com.claimsphere.common.exception.BusinessRuleException;
+import com.claimsphere.common.domain.CurrencyCode;
+import com.claimsphere.common.domain.Market;
+import com.claimsphere.common.exception.ConflictException;
 import com.claimsphere.common.exception.InvalidStateTransitionException;
 import com.claimsphere.policy.domain.Policy;
 import com.claimsphere.policy.domain.ProductType;
-import com.claimsphere.policy.service.PolicyService;
 import com.claimsphere.security.CurrentUser;
 import com.claimsphere.user.domain.Role;
 import com.claimsphere.user.domain.User;
@@ -23,10 +25,8 @@ import com.claimsphere.user.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -35,16 +35,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
-import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class ClaimWorkflowServiceTest {
@@ -55,174 +54,165 @@ class ClaimWorkflowServiceTest {
     @Mock
     private ClaimRepository claimRepository;
     @Mock
-    private ClaimStatusHistoryRepository historyRepository;
+    private ClaimAssignmentRepository assignmentRepository;
     @Mock
-    private PolicyService policyService;
+    private ClaimAssessmentRepository assessmentRepository;
+    @Mock
+    private ClaimDecisionRepository decisionRepository;
+    @Mock
+    private ClaimInformationRequestRepository informationRequestRepository;
     @Mock
     private UserService userService;
     @Mock
-    private ClaimNumberGenerator claimNumberGenerator;
+    private ClaimLookup claimLookup;
     @Mock
-    private ApplicationEventPublisher eventPublisher;
+    private ClaimTransitionRecorder recorder;
 
     private ClaimWorkflowService service;
-
-    private User claimant;
-    private User adjuster;
-    private User otherAdjuster;
-    private Policy policy;
+    private User officer;
+    private User otherOfficer;
+    private User manager;
+    private Claim claim;
 
     @BeforeEach
     void setUp() {
-        service = new ClaimWorkflowService(claimRepository, historyRepository, policyService, userService,
-                new ClaimAccessPolicy(), claimNumberGenerator, eventPublisher, CLOCK);
-        claimant = user(Role.CLAIMANT);
-        adjuster = user(Role.ADJUSTER);
-        otherAdjuster = user(Role.ADJUSTER);
-        policy = new Policy("POL-1", claimant, ProductType.MOTOR, new BigDecimal("10000.00"),
-                new BigDecimal("100.00"), TODAY.minusMonths(6), TODAY.plusMonths(6));
-        ReflectionTestUtils.setField(policy, "id", UUID.randomUUID());
-        lenient().when(userService.getReference(any())).thenAnswer(inv -> userById(inv.getArgument(0)));
+        service = new ClaimWorkflowService(claimRepository, assignmentRepository, assessmentRepository,
+                decisionRepository, informationRequestRepository, userService, claimLookup, new ClaimAccessPolicy(),
+                recorder, CLOCK);
+        User claimant = user(Role.CLAIMANT);
+        officer = user(Role.CLAIMS_OFFICER);
+        otherOfficer = user(Role.CLAIMS_OFFICER);
+        manager = user(Role.MANAGER);
+        Policy policy = new Policy("POL-1", claimant, ProductType.MOTOR, Market.SINGAPORE, CurrencyCode.SGD,
+                new BigDecimal("10000"), BigDecimal.ZERO, TODAY.minusMonths(6), TODAY.plusMonths(6));
+        claim = new Claim("CLM-2026-000001", policy, claimant, TODAY.minusDays(3), "Orchard Rd", "Hail damage",
+                new BigDecimal("2500"), null);
+        ReflectionTestUtils.setField(claim, "id", UUID.randomUUID());
+        lenient().when(claimLookup.loadVisible(eq(claim.getId()), any())).thenReturn(claim);
+        lenient().when(userService.getReference(any())).thenAnswer(inv -> byId(inv.getArgument(0)));
+        lenient().when(userService.getUserWithRole(any(), eq(Role.CLAIMS_OFFICER)))
+                .thenAnswer(inv -> byId(inv.getArgument(0)));
     }
 
     @Test
-    void submitCreatesClaimRecordsHistoryAndRaisesEvent() {
-        when(policyService.getVisiblePolicy(policy.getId(), principal(claimant))).thenReturn(policy);
-        when(claimNumberGenerator.next()).thenReturn("CLM-2026-000001");
+    void officerSelfAssignsUnassignedClaim() {
+        var response = service.assign(claim.getId(), AssignClaimRequest.self(), principal(officer));
 
-        var response = service.submit(new CreateClaimRequest(policy.getId(), TODAY.minusDays(2),
-                "Rear-end collision", new BigDecimal("2500")), principal(claimant));
-
-        assertThat(response.status()).isEqualTo(ClaimStatus.SUBMITTED);
-        assertThat(response.claimedAmount()).isEqualByComparingTo("2500.00");
-        ArgumentCaptor<ClaimStatusHistory> history = ArgumentCaptor.forClass(ClaimStatusHistory.class);
-        verify(historyRepository).save(history.capture());
-        assertThat(history.getValue().getFromStatus()).isNull();
-        assertThat(history.getValue().getToStatus()).isEqualTo(ClaimStatus.SUBMITTED);
-        ArgumentCaptor<ClaimEvent> event = ArgumentCaptor.forClass(ClaimEvent.class);
-        verify(eventPublisher).publishEvent(event.capture());
-        assertThat(event.getValue().eventType()).isEqualTo(ClaimEventType.CLAIM_SUBMITTED);
-        assertThat(event.getValue().claimantId()).isEqualTo(claimant.getId());
+        assertThat(response.status()).isEqualTo(ClaimStatus.UNDER_REVIEW);
+        assertThat(response.assignedOfficerId()).isEqualTo(officer.getId());
+        verify(assignmentRepository).save(any());
+        verify(recorder).record(eq(claim), eq(ClaimStatus.SUBMITTED), any(), any(), eq(ClaimEventType.CLAIM_ASSIGNED));
     }
 
     @Test
-    void submitRejectsAmountAboveCoverage() {
-        when(policyService.getVisiblePolicy(policy.getId(), principal(claimant))).thenReturn(policy);
-
-        assertThatThrownBy(() -> service.submit(new CreateClaimRequest(policy.getId(), TODAY.minusDays(1),
-                "Total loss", new BigDecimal("10000.01")), principal(claimant)))
-                .isInstanceOf(BusinessRuleException.class)
-                .hasFieldOrPropertyWithValue("errorCode", "AMOUNT_EXCEEDS_COVERAGE");
-        verify(claimRepository, never()).saveAndFlush(any());
+    void officerCannotAssignSomeoneElse() {
+        assertThatThrownBy(() -> service.assign(claim.getId(), new AssignClaimRequest(otherOfficer.getId(), null),
+                principal(officer))).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
-    void submitRejectsFutureIncidentDate() {
-        when(policyService.getVisiblePolicy(policy.getId(), principal(claimant))).thenReturn(policy);
+    void officerCannotTakeOverAnAlreadyAssignedClaim() {
+        claim.assignTo(officer);
 
-        assertThatThrownBy(() -> service.submit(new CreateClaimRequest(policy.getId(), TODAY.plusDays(1),
-                "Future", new BigDecimal("10")), principal(claimant)))
-                .hasFieldOrPropertyWithValue("errorCode", "INCIDENT_DATE_IN_FUTURE");
+        assertThatThrownBy(() -> service.assign(claim.getId(), AssignClaimRequest.self(), principal(otherOfficer)))
+                .isInstanceOf(ConflictException.class)
+                .hasFieldOrPropertyWithValue("errorCode", "CLAIM_ALREADY_ASSIGNED");
+        verify(assignmentRepository, never()).save(any());
     }
 
     @Test
-    void submitRejectsIncidentBeforePolicyStart() {
-        when(policyService.getVisiblePolicy(policy.getId(), principal(claimant))).thenReturn(policy);
+    void managerCanReassignClaimInReview() {
+        claim.assignTo(officer);
 
-        assertThatThrownBy(() -> service.submit(new CreateClaimRequest(policy.getId(), TODAY.minusYears(1),
-                "Old incident", new BigDecimal("10")), principal(claimant)))
-                .hasFieldOrPropertyWithValue("errorCode", "INCIDENT_OUTSIDE_POLICY_PERIOD");
+        var response = service.assign(claim.getId(), new AssignClaimRequest(otherOfficer.getId(), "Workload"),
+                principal(manager));
+
+        assertThat(response.assignedOfficerId()).isEqualTo(otherOfficer.getId());
+        assertThat(response.status()).isEqualTo(ClaimStatus.UNDER_REVIEW);
     }
 
     @Test
-    void adjusterCannotAssignClaimToAnotherAdjuster() {
-        Claim claim = existingClaim();
+    void onlyAssignedOfficerCanApprove() {
+        claim.assignTo(officer);
 
-        assertThatThrownBy(() -> service.assign(claim.getId(),
-                new AssignClaimRequest(otherAdjuster.getId(), null), principal(adjuster)))
-                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.approve(claim.getId(), new ApproveClaimRequest(BigDecimal.TEN, null),
+                principal(otherOfficer))).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.approve(claim.getId(), new ApproveClaimRequest(BigDecimal.TEN, null),
+                principal(manager))).isInstanceOf(AccessDeniedException.class);
+        verify(decisionRepository, never()).save(any());
     }
 
     @Test
-    void onlyAssignedAdjusterCanApprove() {
-        Claim claim = existingClaim();
-        claim.assignTo(adjuster);
+    void approvalRecordsDecision() {
+        claim.assignTo(officer);
 
-        assertThatThrownBy(() -> service.approve(claim.getId(),
-                new ApproveClaimRequest(new BigDecimal("100"), null), principal(otherAdjuster)))
-                .isInstanceOf(AccessDeniedException.class);
-        assertThat(claim.getStatus()).isEqualTo(ClaimStatus.UNDER_REVIEW);
-    }
+        var response = service.approve(claim.getId(), new ApproveClaimRequest(new BigDecimal("2000"), "OK"),
+                principal(officer));
 
-    @Test
-    void approveCannotExceedClaimedAmount() {
-        Claim claim = existingClaim();
-        claim.assignTo(adjuster);
-
-        assertThatThrownBy(() -> service.approve(claim.getId(),
-                new ApproveClaimRequest(new BigDecimal("2500.01"), null), principal(adjuster)))
-                .hasFieldOrPropertyWithValue("errorCode", "APPROVED_AMOUNT_EXCEEDS_CLAIMED");
-    }
-
-    @Test
-    void approveByAssignedAdjusterRaisesApprovedEvent() {
-        Claim claim = existingClaim();
-        claim.assignTo(adjuster);
-
-        var response = service.approve(claim.getId(),
-                new ApproveClaimRequest(new BigDecimal("2000"), "Within policy terms"), principal(adjuster));
-
-        assertThat(response.status()).isEqualTo(ClaimStatus.APPROVED);
         assertThat(response.approvedAmount()).isEqualByComparingTo("2000.00");
-        ArgumentCaptor<ClaimEvent> event = ArgumentCaptor.forClass(ClaimEvent.class);
-        verify(eventPublisher).publishEvent(event.capture());
-        assertThat(event.getValue().eventType()).isEqualTo(ClaimEventType.CLAIM_APPROVED);
-        assertThat(event.getValue().fromStatus()).isEqualTo("UNDER_REVIEW");
-        assertThat(event.getValue().amount()).isEqualByComparingTo("2000.00");
+        verify(decisionRepository).save(any());
+        verify(recorder).record(eq(claim), eq(ClaimStatus.UNDER_REVIEW), any(), eq("OK"),
+                eq(ClaimEventType.CLAIM_APPROVED));
+    }
+
+    @Test
+    void settlementDateCannotBeInTheFuture() {
+        claim.assignTo(officer);
+        claim.approve(new BigDecimal("2000"));
+
+        assertThatThrownBy(() -> service.settle(claim.getId(),
+                new SettleClaimRequest(new BigDecimal("2000"), TODAY.plusDays(1), null), principal(officer)))
+                .hasFieldOrPropertyWithValue("errorCode", "SETTLEMENT_DATE_IN_FUTURE");
+    }
+
+    @Test
+    void managerCanSettleAndDateDefaultsToToday() {
+        claim.assignTo(officer);
+        claim.approve(new BigDecimal("2000"));
+
+        var response = service.settle(claim.getId(), new SettleClaimRequest(new BigDecimal("1500"), null, "PAY-1"),
+                principal(manager));
+
+        assertThat(response.status()).isEqualTo(ClaimStatus.SETTLED);
+        assertThat(response.settlementDate()).isEqualTo(TODAY);
+        assertThat(response.settledAmount()).isEqualByComparingTo("1500.00");
     }
 
     @Test
     void settlingUnapprovedClaimIsInvalidTransition() {
-        Claim claim = existingClaim();
+        claim.assignTo(officer);
 
-        assertThatThrownBy(() -> service.settle(claim.getId(), ClaimActionRequest.empty(), principal(user(Role.ADMIN))))
+        assertThatThrownBy(() -> service.settle(claim.getId(),
+                new SettleClaimRequest(BigDecimal.TEN, null, null), principal(officer)))
                 .isInstanceOf(InvalidStateTransitionException.class);
-        verify(historyRepository, never()).save(any());
-        verify(eventPublisher, never()).publishEvent(any(Object.class));
+        verify(recorder, never()).record(any(), any(), any(), any(), any());
     }
 
     @Test
-    void claimantCannotWithdrawSomeoneElsesClaim() {
-        Claim claim = existingClaim();
-        User otherClaimant = user(Role.CLAIMANT);
+    void assessmentRequiresClaimInReview() {
+        assertThatThrownBy(() -> service.assess(claim.getId(), new AssessClaimRequest("notes", null),
+                principal(officer))).isInstanceOf(AccessDeniedException.class);
 
-        assertThatThrownBy(() -> service.withdraw(claim.getId(), ClaimActionRequest.empty(), principal(otherClaimant)))
-                .isInstanceOf(com.claimsphere.common.exception.ResourceNotFoundException.class);
+        claim.assignTo(officer);
+        claim.approve(new BigDecimal("100"));
+        assertThatThrownBy(() -> service.assess(claim.getId(), new AssessClaimRequest("notes", null),
+                principal(officer)))
+                .hasFieldOrPropertyWithValue("errorCode", "CLAIM_NOT_IN_REVIEW");
     }
 
-    private Claim existingClaim() {
-        Claim claim = new Claim("CLM-2026-000001", policy, claimant, TODAY.minusDays(3), "Hail damage",
-                new BigDecimal("2500"));
-        ReflectionTestUtils.setField(claim, "id", UUID.randomUUID());
-        when(claimRepository.findDetailedById(claim.getId())).thenReturn(Optional.of(claim));
-        return claim;
-    }
-
-    private User user(Role role) {
-        User user = new User(role.name().toLowerCase() + UUID.randomUUID() + "@example.com", "hash", role.name(), role);
-        ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
-        return user;
-    }
-
-    private User userById(UUID id) {
-        for (User candidate : new User[]{claimant, adjuster, otherAdjuster}) {
+    private User byId(UUID id) {
+        for (User candidate : new User[]{officer, otherOfficer, manager}) {
             if (candidate.getId().equals(id)) {
                 return candidate;
             }
         }
-        User unknown = new User("someone@example.com", "hash", "Someone", Role.ADMIN);
-        ReflectionTestUtils.setField(unknown, "id", id);
-        return unknown;
+        throw new IllegalArgumentException("Unknown user " + id);
+    }
+
+    private static User user(Role role) {
+        User user = new User(UUID.randomUUID() + "@example.com", "hash", role.name(), role);
+        ReflectionTestUtils.setField(user, "id", UUID.randomUUID());
+        return user;
     }
 
     private static CurrentUser principal(User user) {

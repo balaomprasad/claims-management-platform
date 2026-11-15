@@ -1,7 +1,6 @@
 package com.claimsphere.user.service;
 
 import com.claimsphere.security.JwtTokenService;
-import com.claimsphere.user.domain.Role;
 import com.claimsphere.user.domain.User;
 import com.claimsphere.user.dto.LoginRequest;
 import com.claimsphere.user.dto.LoginResponse;
@@ -46,7 +45,8 @@ public class AuthService {
      */
     @Transactional
     public UserResponse register(RegisterRequest request) {
-        User user = userService.createUser(request.email(), request.password(), request.fullName(), Role.CLAIMANT);
+        User user = userService.createClaimant(request.email(), request.password(), request.fullName(),
+                request.market(), request.phone());
         return UserResponse.from(user);
     }
 

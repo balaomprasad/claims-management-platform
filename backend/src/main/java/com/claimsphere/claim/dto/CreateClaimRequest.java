@@ -13,6 +13,7 @@ import java.util.UUID;
 public record CreateClaimRequest(
         @NotNull UUID policyId,
         @NotNull LocalDate incidentDate,
-        @NotBlank @Size(max = 2000) String description,
-        @NotNull @DecimalMin("0.01") @Digits(integer = 13, fraction = 2) BigDecimal claimedAmount) {
+        @NotBlank @Size(max = 300) String incidentLocation,
+        @NotBlank @Size(max = 2000) String incidentDescription,
+        @NotNull @DecimalMin("0.01") @Digits(integer = 13, fraction = 2) BigDecimal estimatedLoss) {
 }

@@ -33,8 +33,7 @@ public class AdminUserController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse createUser(@Valid @RequestBody CreateUserRequest request) {
-        return UserResponse.from(
-                userService.createUser(request.email(), request.password(), request.fullName(), request.role()));
+        return UserResponse.from(userService.provision(request));
     }
 
     @GetMapping

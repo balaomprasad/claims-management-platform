@@ -1,5 +1,6 @@
 package com.claimsphere.support;
 
+import com.claimsphere.common.domain.Market;
 import com.claimsphere.policy.domain.ProductType;
 import com.claimsphere.policy.dto.CreatePolicyRequest;
 import com.claimsphere.policy.dto.PolicyResponse;
@@ -16,6 +17,7 @@ import org.springframework.http.MediaType;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -58,7 +60,9 @@ public abstract class IntegrationTestSupport {
 
     protected TestUser createUser(Role role) throws Exception {
         String email = role.name().toLowerCase() + "-" + UUID.randomUUID() + "@test.claimsphere.local";
-        User user = userService.createUser(email, PASSWORD, role.name() + " Tester", role);
+        User user = role == Role.CLAIMANT
+                ? userService.createClaimant(email, PASSWORD, "Claimant Tester", Market.SINGAPORE, null)
+                : userService.createUser(email, PASSWORD, role.name() + " Tester", role);
         return new TestUser(user.getId(), email, login(email, PASSWORD));
     }
 
@@ -72,23 +76,46 @@ public abstract class IntegrationTestSupport {
     }
 
     protected PolicyResponse createActivePolicy(UUID holderId, BigDecimal coverage) {
+        return createActivePolicy(holderId, coverage, Market.SINGAPORE, ProductType.MOTOR);
+    }
+
+    protected PolicyResponse createActivePolicy(UUID holderId, BigDecimal coverage, Market market,
+                                                ProductType type) {
         LocalDate today = todayUtc();
-        return policyService.createPolicy(new CreatePolicyRequest(holderId, ProductType.MOTOR, coverage,
+        return policyService.createPolicy(new CreatePolicyRequest(holderId, type, market, null, coverage,
                 BigDecimal.valueOf(100), today.minusMonths(6), today.plusMonths(6)));
     }
 
     /**
-     * Submits a claim of 800.00 for yesterday's incident and returns its id.
+     * Submits a claim with an estimated loss of 800.00 for yesterday's incident and returns its id.
      */
     protected String submitClaim(TestUser claimant, PolicyResponse policy) throws Exception {
+        return submitClaim(claimant, policy, "800");
+    }
+
+    protected String submitClaim(TestUser claimant, PolicyResponse policy, String estimatedLoss) throws Exception {
         String body = mockMvc.perform(post("/api/v1/claims").header("Authorization", claimant.bearer())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("policyId", policy.id(),
-                                "incidentDate", todayUtc().minusDays(1).toString(),
-                                "description", "Water damage", "claimedAmount", "800"))))
+                        .content(json(claimBody(policy, estimatedLoss))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return readJson(body).get("id").asText();
+    }
+
+    protected Map<String, Object> claimBody(PolicyResponse policy, String estimatedLoss) {
+        return Map.of("policyId", policy.id(),
+                "incidentDate", todayUtc().minusDays(1).toString(),
+                "incidentLocation", "Orchard Road, Singapore",
+                "incidentDescription", "Water damage",
+                "estimatedLoss", estimatedLoss);
+    }
+
+    protected ResultActions postAs(TestUser user, String url, Object body, Object... uriVars) throws Exception {
+        var request = post(url, uriVars).header("Authorization", user.bearer());
+        if (body != null) {
+            request.contentType(MediaType.APPLICATION_JSON).content(json(body));
+        }
+        return mockMvc.perform(request);
     }
 
     protected String json(Object value) throws Exception {

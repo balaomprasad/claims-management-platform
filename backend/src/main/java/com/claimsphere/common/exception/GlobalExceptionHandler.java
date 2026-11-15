@@ -3,6 +3,7 @@ package com.claimsphere.common.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -52,6 +53,14 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     public ProblemDetail handleOptimisticLock(ObjectOptimisticLockingFailureException ex) {
         return problem(HttpStatus.CONFLICT, "CONCURRENT_MODIFICATION",
                 "The resource was modified by another request. Reload and try again.");
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(DataIntegrityViolationException ex) {
+        // Typically a unique-constraint race (e.g. concurrent duplicate submission); details are not exposed.
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getClass().getSimpleName());
+        return problem(HttpStatus.CONFLICT, "DATA_CONFLICT",
+                "The request conflicts with existing data. Reload and try again.");
     }
 
     @ExceptionHandler(BadCredentialsException.class)

@@ -75,6 +75,5 @@ app:
     partitions: ${KAFKA_TOPIC_PARTITIONS:3}
     replicas: ${KAFKA_TOPIC_REPLICAS:1}
   demo:
-    admin-password: ${DEMO_ADMIN_PASSWORD:}
-    adjuster-password: ${DEMO_ADJUSTER_PASSWORD:}
-    claimant-password: ${DEMO_CLAIMANT_PASSWORD:}
+    # Shared password for all seeded demo accounts (demo profile only). Nothing is seeded when blank.
+    password: ${DEMO_PASSWORD:}

@@ -1,11 +1,17 @@
 package com.claimsphere.user.service;
 
+import com.claimsphere.common.domain.Market;
 import com.claimsphere.common.exception.BusinessRuleException;
 import com.claimsphere.common.exception.ConflictException;
 import com.claimsphere.common.exception.ResourceNotFoundException;
+import com.claimsphere.user.domain.ClaimantProfile;
 import com.claimsphere.user.domain.Role;
 import com.claimsphere.user.domain.User;
+import com.claimsphere.user.dto.ClaimantProfileRequest;
+import com.claimsphere.user.dto.ClaimantProfileResponse;
+import com.claimsphere.user.dto.CreateUserRequest;
 import com.claimsphere.user.dto.UserResponse;
+import com.claimsphere.user.repository.ClaimantProfileRepository;
 import com.claimsphere.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,11 +33,35 @@ public class UserService {
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
 
     private final UserRepository userRepository;
+    private final ClaimantProfileRepository claimantProfileRepository;
     private final PasswordEncoder passwordEncoder;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, ClaimantProfileRepository claimantProfileRepository,
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
+        this.claimantProfileRepository = claimantProfileRepository;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    /**
+     * Admin provisioning entry point: claimants also get a profile (market required); staff do not.
+     */
+    @Transactional
+    public User provision(CreateUserRequest request) {
+        if (request.role() == Role.CLAIMANT) {
+            if (request.market() == null) {
+                throw new BusinessRuleException("MARKET_REQUIRED", "market is required when creating a claimant");
+            }
+            return createClaimant(request.email(), request.password(), request.fullName(), request.market(), null);
+        }
+        return createUser(request.email(), request.password(), request.fullName(), request.role());
+    }
+
+    @Transactional
+    public User createClaimant(String email, String rawPassword, String fullName, Market market, String phone) {
+        User user = createUser(email, rawPassword, fullName, Role.CLAIMANT);
+        claimantProfileRepository.save(new ClaimantProfile(user.getId(), market, blankToNull(phone), null));
+        return user;
     }
 
     @Transactional
@@ -79,5 +109,26 @@ public class UserService {
 
     static String normaliseEmail(String email) {
         return email.trim().toLowerCase(Locale.ROOT);
+    }
+
+    @Transactional(readOnly = true)
+    public ClaimantProfileResponse getClaimantProfile(UUID userId) {
+        return ClaimantProfileResponse.from(getUser(userId), loadProfile(userId));
+    }
+
+    @Transactional
+    public ClaimantProfileResponse updateClaimantProfile(UUID userId, ClaimantProfileRequest request) {
+        ClaimantProfile profile = loadProfile(userId);
+        profile.update(request.market(), blankToNull(request.phone()), blankToNull(request.address()));
+        return ClaimantProfileResponse.from(getUser(userId), profile);
+    }
+
+    private ClaimantProfile loadProfile(UUID userId) {
+        return claimantProfileRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Claimant profile", userId));
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

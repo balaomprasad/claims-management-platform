@@ -1,5 +1,7 @@
 package com.claimsphere.policy.dto;
 
+import com.claimsphere.common.domain.CurrencyCode;
+import com.claimsphere.common.domain.Market;
 import com.claimsphere.policy.domain.Policy;
 import com.claimsphere.policy.domain.PolicyStatus;
 import com.claimsphere.policy.domain.ProductType;
@@ -15,6 +17,8 @@ public record PolicyResponse(
         UUID holderId,
         String holderName,
         ProductType productType,
+        Market market,
+        CurrencyCode currency,
         BigDecimal coverageAmount,
         BigDecimal deductible,
         LocalDate startDate,
@@ -24,8 +28,8 @@ public record PolicyResponse(
 
     public static PolicyResponse from(Policy policy) {
         return new PolicyResponse(policy.getId(), policy.getPolicyNumber(), policy.getHolder().getId(),
-                policy.getHolder().getFullName(), policy.getProductType(), policy.getCoverageAmount(),
-                policy.getDeductible(), policy.getStartDate(), policy.getEndDate(), policy.getStatus(),
-                policy.getCreatedAt());
+                policy.getHolder().getFullName(), policy.getProductType(), policy.getMarket(), policy.getCurrency(),
+                policy.getCoverageAmount(), policy.getDeductible(), policy.getStartDate(), policy.getEndDate(),
+                policy.getStatus(), policy.getCreatedAt());
     }
 }

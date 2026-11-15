@@ -1,5 +1,7 @@
 package com.claimsphere.policy.domain;
 
+import com.claimsphere.common.domain.CurrencyCode;
+import com.claimsphere.common.domain.Market;
 import com.claimsphere.common.persistence.AuditableEntity;
 import com.claimsphere.user.domain.User;
 import jakarta.persistence.Column;
@@ -57,19 +59,39 @@ public class Policy extends AuditableEntity {
     @Column(nullable = false)
     private PolicyStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false)
+    private Market market;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(nullable = false, length = 3)
+    private CurrencyCode currency;
+
     protected Policy() {
     }
 
-    public Policy(String policyNumber, User holder, ProductType productType, BigDecimal coverageAmount,
-                  BigDecimal deductible, LocalDate startDate, LocalDate endDate) {
+    public Policy(String policyNumber, User holder, ProductType productType, Market market, CurrencyCode currency,
+                  BigDecimal coverageAmount, BigDecimal deductible, LocalDate startDate, LocalDate endDate) {
         this.policyNumber = policyNumber;
         this.holder = holder;
         this.productType = productType;
+        this.market = market;
+        this.currency = currency;
         this.coverageAmount = coverageAmount;
         this.deductible = deductible;
         this.startDate = startDate;
         this.endDate = endDate;
         this.status = PolicyStatus.ACTIVE;
+    }
+
+    public Market getMarket() {
+        return market;
+    }
+
+    public CurrencyCode getCurrency() {
+        return currency;
     }
 
     public boolean isActive() {

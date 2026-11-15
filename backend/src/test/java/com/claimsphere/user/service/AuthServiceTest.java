@@ -1,7 +1,9 @@
 package com.claimsphere.user.service;
 
+import com.claimsphere.common.domain.Market;
 import com.claimsphere.common.exception.ConflictException;
 import com.claimsphere.security.JwtTokenService;
+import com.claimsphere.user.repository.ClaimantProfileRepository;
 import com.claimsphere.user.domain.Role;
 import com.claimsphere.user.domain.User;
 import com.claimsphere.user.dto.LoginRequest;
@@ -35,13 +37,16 @@ class AuthServiceTest {
     @Mock
     private JwtTokenService jwtTokenService;
 
+    @Mock
+    private ClaimantProfileRepository claimantProfileRepository;
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        UserService userService = new UserService(userRepository, passwordEncoder);
+        UserService userService = new UserService(userRepository, claimantProfileRepository, passwordEncoder);
         authService = new AuthService(userService, userRepository, passwordEncoder, jwtTokenService);
     }
 
@@ -50,7 +55,7 @@ class AuthServiceTest {
         when(userRepository.existsByEmail("jane@example.com")).thenReturn(false);
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        authService.register(new RegisterRequest("  Jane@Example.com ", "password123", "Jane Doe"));
+        authService.register(new RegisterRequest("  Jane@Example.com ", "password123", "Jane Doe", Market.SINGAPORE, null));
 
         ArgumentCaptor<User> saved = ArgumentCaptor.forClass(User.class);
         verify(userRepository).save(saved.capture());
@@ -64,7 +69,8 @@ class AuthServiceTest {
     void registerRejectsDuplicateEmail() {
         when(userRepository.existsByEmail("jane@example.com")).thenReturn(true);
 
-        assertThatThrownBy(() -> authService.register(new RegisterRequest("jane@example.com", "password123", "Jane")))
+        assertThatThrownBy(() -> authService.register(
+                new RegisterRequest("jane@example.com", "password123", "Jane", Market.SINGAPORE, null)))
                 .isInstanceOf(ConflictException.class);
         verify(userRepository, never()).save(any());
     }

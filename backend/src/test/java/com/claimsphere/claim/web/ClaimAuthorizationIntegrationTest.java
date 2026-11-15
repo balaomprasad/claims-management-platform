@@ -22,8 +22,9 @@ class ClaimAuthorizationIntegrationTest extends IntegrationTestSupport {
 
     private TestUser claimant;
     private TestUser otherClaimant;
-    private TestUser adjuster;
-    private TestUser otherAdjuster;
+    private TestUser officer;
+    private TestUser otherOfficer;
+    private TestUser manager;
     private TestUser admin;
     private PolicyResponse policy;
     private String claimId;
@@ -32,8 +33,9 @@ class ClaimAuthorizationIntegrationTest extends IntegrationTestSupport {
     void setUp() throws Exception {
         claimant = createUser(Role.CLAIMANT);
         otherClaimant = createUser(Role.CLAIMANT);
-        adjuster = createUser(Role.ADJUSTER);
-        otherAdjuster = createUser(Role.ADJUSTER);
+        officer = createUser(Role.CLAIMS_OFFICER);
+        otherOfficer = createUser(Role.CLAIMS_OFFICER);
+        manager = createUser(Role.MANAGER);
         admin = createUser(Role.ADMIN);
         policy = createActivePolicy(claimant.id(), new BigDecimal("10000"));
         claimId = submitClaim(claimant, policy);
@@ -41,10 +43,11 @@ class ClaimAuthorizationIntegrationTest extends IntegrationTestSupport {
 
     @Test
     void claimantCannotSeeAnotherClaimantsClaimOrPolicy() throws Exception {
-        mockMvc.perform(get("/api/v1/claims/{id}", claimId).header("Authorization", otherClaimant.bearer()))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(get("/api/v1/claims/{id}/history", claimId).header("Authorization", otherClaimant.bearer()))
-                .andExpect(status().isNotFound());
+        for (String url : new String[]{"/api/v1/claims/{id}", "/api/v1/claims/{id}/history",
+                "/api/v1/claims/{id}/information-requests"}) {
+            mockMvc.perform(get(url, claimId).header("Authorization", otherClaimant.bearer()))
+                    .andExpect(status().isNotFound());
+        }
         mockMvc.perform(get("/api/v1/policies/{id}", policy.id()).header("Authorization", otherClaimant.bearer()))
                 .andExpect(status().isNotFound());
         mockMvc.perform(get("/api/v1/claims").header("Authorization", otherClaimant.bearer()))
@@ -53,86 +56,102 @@ class ClaimAuthorizationIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void claimantFiltersCannotWidenScopeToOtherClaimants() throws Exception {
+        mockMvc.perform(get("/api/v1/claims").param("unassigned", "true")
+                        .header("Authorization", otherClaimant.bearer()))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
     void claimantCannotFileClaimOnAnotherClaimantsPolicy() throws Exception {
         mockMvc.perform(post("/api/v1/claims").header("Authorization", otherClaimant.bearer())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("policyId", policy.id(),
-                                "incidentDate", todayUtc().toString(),
-                                "description", "Not my policy", "claimedAmount", "10"))))
+                        .contentType(MediaType.APPLICATION_JSON).content(json(claimBody(policy, "10"))))
                 .andExpect(status().isNotFound());
     }
 
     @Test
-    void claimantCannotPerformAdjusterOrAdminActions() throws Exception {
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", claimant.bearer()))
+    void claimantCannotPerformStaffActionsOrSeeInternalNotes() throws Exception {
+        postAs(claimant, "/api/v1/claims/{id}/assign", null, claimId).andExpect(status().isForbidden());
+        postAs(claimant, "/api/v1/claims/{id}/approve", Map.of("approvedAmount", "10"), claimId)
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/claims/{id}/approve", claimId).header("Authorization", claimant.bearer())
-                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("approvedAmount", "10"))))
+        postAs(claimant, "/api/v1/claims/{id}/settle", Map.of("settledAmount", "10"), claimId)
                 .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/claims/{id}/settle", claimId).header("Authorization", claimant.bearer()))
+        mockMvc.perform(get("/api/v1/claims/{id}/assessments", claimId).header("Authorization", claimant.bearer()))
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/v1/claims/summary").header("Authorization", claimant.bearer()))
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void adjusterAndAdminCannotSubmitClaims() throws Exception {
-        String body = json(Map.of("policyId", policy.id(), "incidentDate", todayUtc().toString(),
-                "description", "x", "claimedAmount", "10"));
-        mockMvc.perform(post("/api/v1/claims").header("Authorization", adjuster.bearer())
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isForbidden());
-        mockMvc.perform(post("/api/v1/claims").header("Authorization", admin.bearer())
-                        .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isForbidden());
+    void staffCannotSubmitClaims() throws Exception {
+        for (TestUser staff : new TestUser[]{officer, manager, admin}) {
+            mockMvc.perform(post("/api/v1/claims").header("Authorization", staff.bearer())
+                            .contentType(MediaType.APPLICATION_JSON).content(json(claimBody(policy, "10"))))
+                    .andExpect(status().isForbidden());
+        }
     }
 
     @Test
-    void onlyAssignedAdjusterCanApprove() throws Exception {
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", admin.bearer())
-                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("adjusterId", adjuster.id()))))
+    void onlyAssignedOfficerCanDecide() throws Exception {
+        postAs(manager, "/api/v1/claims/{id}/assign", Map.of("officerId", officer.id()), claimId)
                 .andExpect(status().isOk());
 
-        mockMvc.perform(post("/api/v1/claims/{id}/approve", claimId).header("Authorization", otherAdjuster.bearer())
-                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("approvedAmount", "10"))))
+        postAs(otherOfficer, "/api/v1/claims/{id}/approve", Map.of("approvedAmount", "10"), claimId)
+                .andExpect(status().isForbidden());
+        postAs(manager, "/api/v1/claims/{id}/approve", Map.of("approvedAmount", "10"), claimId)
+                .andExpect(status().isForbidden());
+        postAs(otherOfficer, "/api/v1/claims/{id}/request-information", Map.of("message", "x"), claimId)
                 .andExpect(status().isForbidden());
     }
 
     @Test
-    void adjusterCannotAssignClaimToSomeoneElse() throws Exception {
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", adjuster.bearer())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(Map.of("adjusterId", otherAdjuster.id()))))
-                .andExpect(status().isForbidden());
+    void officerCannotTakeOverAssignedClaimButManagerCanReassign() throws Exception {
+        postAs(officer, "/api/v1/claims/{id}/assign", null, claimId).andExpect(status().isOk());
+
+        postAs(otherOfficer, "/api/v1/claims/{id}/assign", null, claimId)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.errorCode").value("CLAIM_ALREADY_ASSIGNED"));
+
+        postAs(manager, "/api/v1/claims/{id}/assign", Map.of("officerId", otherOfficer.id()), claimId)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.assignedOfficerId").value(otherOfficer.id().toString()))
+                .andExpect(jsonPath("$.status").value("UNDER_REVIEW"));
+
+        mockMvc.perform(get("/api/v1/claims/{id}/assignments", claimId).header("Authorization", manager.bearer()))
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
-    void adminCannotAssignClaimToNonAdjuster() throws Exception {
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", admin.bearer())
-                        .contentType(MediaType.APPLICATION_JSON).content(json(Map.of("adjusterId", claimant.id()))))
+    void officerCannotAssignSomeoneElseAndAdminCannotAssignNonOfficer() throws Exception {
+        postAs(officer, "/api/v1/claims/{id}/assign", Map.of("officerId", otherOfficer.id()), claimId)
+                .andExpect(status().isForbidden());
+        postAs(admin, "/api/v1/claims/{id}/assign", Map.of("officerId", claimant.id()), claimId)
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_USER_ROLE"));
     }
 
     @Test
     void invalidTransitionsReturn409() throws Exception {
-        mockMvc.perform(post("/api/v1/claims/{id}/settle", claimId).header("Authorization", admin.bearer()))
+        postAs(officer, "/api/v1/claims/{id}/approve", Map.of("approvedAmount", "10"), claimId)
+                .andExpect(status().isForbidden());
+        postAs(manager, "/api/v1/claims/{id}/settle", Map.of("settledAmount", "10"), claimId)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.errorCode").value("INVALID_STATE_TRANSITION"));
+        postAs(claimant, "/api/v1/claims/{id}/information", Map.of("response", "x"), claimId)
+                .andExpect(status().isConflict());
 
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", adjuster.bearer()))
-                .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", adjuster.bearer()))
+        postAs(officer, "/api/v1/claims/{id}/assign", null, claimId).andExpect(status().isOk());
+        postAs(officer, "/api/v1/claims/{id}/settle", Map.of("settledAmount", "10"), claimId)
                 .andExpect(status().isConflict());
     }
 
     @Test
     void claimantCanWithdrawOwnClaimButNotOthers() throws Exception {
-        mockMvc.perform(post("/api/v1/claims/{id}/withdraw", claimId).header("Authorization", otherClaimant.bearer()))
-                .andExpect(status().isNotFound());
-        mockMvc.perform(post("/api/v1/claims/{id}/withdraw", claimId).header("Authorization", claimant.bearer()))
+        postAs(otherClaimant, "/api/v1/claims/{id}/withdraw", null, claimId).andExpect(status().isNotFound());
+        postAs(claimant, "/api/v1/claims/{id}/withdraw", null, claimId)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("WITHDRAWN"));
+                .andExpect(jsonPath("$.status").value("WITHDRAWN"))
+                .andExpect(jsonPath("$.closedAt").exists());
     }
 
     @Test

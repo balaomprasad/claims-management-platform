@@ -3,7 +3,7 @@ package com.claimsphere.claim.dto;
 import jakarta.validation.constraints.Size;
 
 /**
- * Optional comment for actions that need no other input (settle, withdraw).
+ * Optional comment for actions that need no other input (withdraw).
  */
 public record ClaimActionRequest(@Size(max = 1000) String comment) {
 

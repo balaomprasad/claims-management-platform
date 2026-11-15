@@ -23,31 +23,31 @@ class ClaimEventKafkaIntegrationTest extends IntegrationTestSupport {
     @Test
     void claimTransitionsProduceNotificationsThroughKafka() throws Exception {
         TestUser claimant = createUser(Role.CLAIMANT);
-        TestUser adjuster = createUser(Role.ADJUSTER);
+        TestUser officer = createUser(Role.CLAIMS_OFFICER);
         TestUser stranger = createUser(Role.CLAIMANT);
         String claimId = submitClaim(claimant, createActivePolicy(claimant.id(), new BigDecimal("5000")));
 
-        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", adjuster.bearer()))
+        mockMvc.perform(post("/api/v1/claims/{id}/assign", claimId).header("Authorization", officer.bearer()))
                 .andExpect(status().isOk());
 
         await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
                 assertThat(notifications(claimant)).hasSize(2));
         await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
-                assertThat(notifications(adjuster)).hasSize(1));
+                assertThat(notifications(officer)).hasSize(1));
 
-        JsonNode adjusterNotification = notifications(adjuster).get(0);
-        assertThat(adjusterNotification.get("type").asText()).isEqualTo("CLAIM_ASSIGNED");
-        assertThat(adjusterNotification.get("claimId").asText()).isEqualTo(claimId);
-        assertThat(adjusterNotification.get("read").asBoolean()).isFalse();
+        JsonNode officerNotification = notifications(officer).get(0);
+        assertThat(officerNotification.get("type").asText()).isEqualTo("CLAIM_ASSIGNED");
+        assertThat(officerNotification.get("claimId").asText()).isEqualTo(claimId);
+        assertThat(officerNotification.get("read").asBoolean()).isFalse();
 
-        String notificationId = adjusterNotification.get("id").asText();
+        String notificationId = officerNotification.get("id").asText();
         mockMvc.perform(patch("/api/v1/notifications/{id}/read", notificationId)
                         .header("Authorization", stranger.bearer()))
                 .andExpect(status().isNotFound());
         mockMvc.perform(patch("/api/v1/notifications/{id}/read", notificationId)
-                        .header("Authorization", adjuster.bearer()))
+                        .header("Authorization", officer.bearer()))
                 .andExpect(status().isNoContent());
-        assertThat(notifications(adjuster).get(0).get("read").asBoolean()).isTrue();
+        assertThat(notifications(officer).get(0).get("read").asBoolean()).isTrue();
         assertThat(notifications(stranger)).isEmpty();
     }
 

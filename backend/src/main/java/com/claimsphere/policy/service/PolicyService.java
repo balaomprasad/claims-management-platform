@@ -1,5 +1,6 @@
 package com.claimsphere.policy.service;
 
+import com.claimsphere.common.domain.CurrencyCode;
 import com.claimsphere.common.exception.BusinessRuleException;
 import com.claimsphere.common.exception.ResourceNotFoundException;
 import com.claimsphere.policy.domain.Policy;
@@ -43,7 +44,9 @@ public class PolicyService {
             throw new BusinessRuleException("INVALID_DEDUCTIBLE", "Deductible must be lower than coverage amount");
         }
         User holder = userService.getUserWithRole(request.holderId(), Role.CLAIMANT);
+        CurrencyCode currency = request.currency() != null ? request.currency() : request.market().localCurrency();
         Policy policy = policyRepository.save(new Policy(generatePolicyNumber(), holder, request.productType(),
+                request.market(), currency,
                 request.coverageAmount().setScale(2, RoundingMode.HALF_UP),
                 request.deductible().setScale(2, RoundingMode.HALF_UP),
                 request.startDate(), request.endDate()));

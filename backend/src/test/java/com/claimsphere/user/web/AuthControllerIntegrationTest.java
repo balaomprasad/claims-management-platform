@@ -22,7 +22,7 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(Map.of("email", email, "password", PASSWORD,
-                                "fullName", "New User", "role", "ADMIN"))))
+                                "fullName", "New User", "market", "INDIA", "role", "ADMIN"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.role").value("CLAIMANT"))
                 .andExpect(jsonPath("$.passwordHash").doesNotExist());
@@ -68,7 +68,7 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
         TestUser claimant = createUser(Role.CLAIMANT);
         TestUser admin = createUser(Role.ADMIN);
         Map<String, String> request = Map.of("email", "adj-" + UUID.randomUUID() + "@test.claimsphere.local",
-                "password", PASSWORD, "fullName", "Adjuster", "role", "ADJUSTER");
+                "password", PASSWORD, "fullName", "Officer", "role", "CLAIMS_OFFICER");
 
         mockMvc.perform(post("/api/v1/admin/users").header("Authorization", claimant.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(json(request)))
@@ -77,6 +77,6 @@ class AuthControllerIntegrationTest extends IntegrationTestSupport {
         mockMvc.perform(post("/api/v1/admin/users").header("Authorization", admin.bearer())
                         .contentType(MediaType.APPLICATION_JSON).content(json(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.role").value("ADJUSTER"));
+                .andExpect(jsonPath("$.role").value("CLAIMS_OFFICER"));
     }
 }

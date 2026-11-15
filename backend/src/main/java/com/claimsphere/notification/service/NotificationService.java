@@ -69,24 +69,26 @@ public class NotificationService {
 
     private static Map<UUID, String> recipientsAndMessages(ClaimEvent event) {
         String claim = "Claim " + event.claimNumber();
+        String amount = event.amount() + " " + event.currency();
         Map<UUID, String> messages = new LinkedHashMap<>();
         UUID claimant = event.claimantId();
-        UUID adjuster = event.assignedAdjusterId();
+        UUID officer = event.assignedOfficerId();
         switch (event.eventType()) {
             case CLAIM_SUBMITTED -> messages.put(claimant, claim + " has been submitted.");
             case CLAIM_ASSIGNED -> {
-                messages.put(claimant, claim + " is now under review.");
-                putIfPresent(messages, adjuster, claim + " has been assigned to you.");
+                messages.put(claimant, claim + " is being reviewed by a claims officer.");
+                putIfPresent(messages, officer, claim + " has been assigned to you.");
             }
-            case CLAIM_APPROVED -> messages.put(claimant, claim + " has been approved for " + event.amount() + ".");
+            case CLAIM_INFORMATION_REQUESTED ->
+                    messages.put(claimant, "Additional information is required for " + claim + ".");
+            case CLAIM_INFORMATION_PROVIDED ->
+                    putIfPresent(messages, officer, "The claimant has provided information for " + claim + ".");
+            case CLAIM_APPROVED -> messages.put(claimant, claim + " has been approved for " + amount + ".");
             case CLAIM_REJECTED -> messages.put(claimant, claim + " has been rejected.");
-            case CLAIM_SETTLED -> {
-                messages.put(claimant, claim + " has been settled for " + event.amount() + ".");
-                putIfPresent(messages, adjuster, claim + " has been settled.");
-            }
+            case CLAIM_SETTLED -> messages.put(claimant, claim + " has been settled for " + amount + ".");
             case CLAIM_WITHDRAWN -> {
                 messages.put(claimant, claim + " has been withdrawn.");
-                putIfPresent(messages, adjuster, claim + " was withdrawn by the claimant.");
+                putIfPresent(messages, officer, claim + " was withdrawn by the claimant.");
             }
         }
         return messages;

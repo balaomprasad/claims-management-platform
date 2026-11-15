@@ -33,7 +33,7 @@ class NotificationServiceTest {
     private NotificationService service;
 
     private final UUID claimantId = UUID.randomUUID();
-    private final UUID adjusterId = UUID.randomUUID();
+    private final UUID officerId = UUID.randomUUID();
 
     @BeforeEach
     void setUp() {
@@ -42,7 +42,7 @@ class NotificationServiceTest {
     }
 
     @Test
-    void assignedEventNotifiesClaimantAndAdjuster() {
+    void assignedEventNotifiesClaimantAndOfficer() {
         ClaimEvent event = event(ClaimEventType.CLAIM_ASSIGNED);
 
         int created = service.createForClaimEvent(event);
@@ -50,7 +50,7 @@ class NotificationServiceTest {
         assertThat(created).isEqualTo(2);
         ArgumentCaptor<Notification> saved = ArgumentCaptor.forClass(Notification.class);
         verify(notificationRepository, times(2)).save(saved.capture());
-        assertThat(saved.getAllValues()).extracting(Notification::getUserId).containsExactly(claimantId, adjusterId);
+        assertThat(saved.getAllValues()).extracting(Notification::getUserId).containsExactly(claimantId, officerId);
         assertThat(saved.getAllValues().get(1).getMessage()).contains("assigned to you");
     }
 
@@ -66,7 +66,8 @@ class NotificationServiceTest {
     }
 
     private ClaimEvent event(ClaimEventType type) {
-        return new ClaimEvent(UUID.randomUUID(), type, 1, Instant.now(), UUID.randomUUID(), "CLM-2026-000001",
-                claimantId, adjusterId, "SUBMITTED", "UNDER_REVIEW", new BigDecimal("100.00"), adjusterId);
+        return new ClaimEvent(UUID.randomUUID(), type, 2, Instant.now(), "corr-1", UUID.randomUUID(),
+                "CLM-2026-000001", claimantId, officerId, "SUBMITTED", "UNDER_REVIEW", new BigDecimal("100.00"), "SGD",
+                officerId);
     }
 }
