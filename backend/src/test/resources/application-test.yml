@@ -1,0 +1,25 @@
+spring:
+  datasource:
+    # Defaults to in-memory H2 (PostgreSQL mode). CI overrides these with a real PostgreSQL service.
+    url: ${TEST_DB_URL:jdbc:h2:mem:claimsphere;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1}
+    username: ${TEST_DB_USERNAME:sa}
+    password: ${TEST_DB_PASSWORD:}
+  kafka:
+    bootstrap-servers: ${spring.embedded.kafka.brokers}
+
+logging:
+  structured:
+    format:
+      console: ""
+  level:
+    org.apache.kafka: WARN
+    kafka: WARN
+    org.apache.zookeeper: WARN
+    state.change.logger: WARN
+
+app:
+  jwt:
+    # Test-only signing key; never used outside the test profile.
+    secret: test-only-signing-key-0123456789abcdef0123456789abcdef
+  kafka:
+    partitions: 1
