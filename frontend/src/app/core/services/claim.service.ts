@@ -1,28 +1,29 @@
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL, Page } from '../models/api.model';
 import {
-  ApproveClaimRequest,
-  AssignClaimRequest,
   Claim,
+  ClaimAssessment,
+  ClaimDecision,
   ClaimHistoryEntry,
-  ClaimStatus,
+  ClaimInformationRequest,
+  ClaimPriority,
+  ClaimSearch,
   ClaimSummary,
   CreateClaimRequest,
-  RejectClaimRequest,
+  SettleClaimRequest,
+  UpdateClaimRequest,
 } from '../models/claim.model';
+import { toParams } from '../utils/http-params';
 
 @Injectable({ providedIn: 'root' })
 export class ClaimService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${API_BASE_URL}/claims`;
 
-  list(page: number, size: number, status?: ClaimStatus | null): Observable<Page<Claim>> {
-    let params = new HttpParams().set('page', page).set('size', size).set('sort', 'createdAt,desc');
-    if (status) {
-      params = params.set('status', status);
-    }
+  search(search: ClaimSearch, page: number, size: number, sort = 'createdAt,desc'): Observable<Page<Claim>> {
+    const params = toParams({ ...search, page, size, sort });
     return this.http.get<Page<Claim>>(this.baseUrl, { params });
   }
 
@@ -30,35 +31,77 @@ export class ClaimService {
     return this.http.get<Claim>(`${this.baseUrl}/${id}`);
   }
 
-  history(id: string): Observable<ClaimHistoryEntry[]> {
-    return this.http.get<ClaimHistoryEntry[]>(`${this.baseUrl}/${id}/history`);
+  getByNumber(claimNumber: string): Observable<Claim> {
+    return this.http.get<Claim>(`${this.baseUrl}/by-number/${encodeURIComponent(claimNumber)}`);
   }
 
   summary(): Observable<ClaimSummary> {
     return this.http.get<ClaimSummary>(`${this.baseUrl}/summary`);
   }
 
-  submit(request: CreateClaimRequest): Observable<Claim> {
-    return this.http.post<Claim>(this.baseUrl, request);
+  history(id: string): Observable<ClaimHistoryEntry[]> {
+    return this.http.get<ClaimHistoryEntry[]>(`${this.baseUrl}/${id}/history`);
   }
 
-  assign(id: string, request: AssignClaimRequest = {}): Observable<Claim> {
-    return this.http.post<Claim>(`${this.baseUrl}/${id}/assign`, request);
+  decision(id: string): Observable<ClaimDecision> {
+    return this.http.get<ClaimDecision>(`${this.baseUrl}/${id}/decision`);
   }
 
-  approve(id: string, request: ApproveClaimRequest): Observable<Claim> {
-    return this.http.post<Claim>(`${this.baseUrl}/${id}/approve`, request);
+  informationRequests(id: string): Observable<ClaimInformationRequest[]> {
+    return this.http.get<ClaimInformationRequest[]>(`${this.baseUrl}/${id}/information-requests`);
   }
 
-  reject(id: string, request: RejectClaimRequest): Observable<Claim> {
-    return this.http.post<Claim>(`${this.baseUrl}/${id}/reject`, request);
+  assessments(id: string): Observable<ClaimAssessment[]> {
+    return this.http.get<ClaimAssessment[]>(`${this.baseUrl}/${id}/assessments`);
   }
 
-  settle(id: string, comment?: string): Observable<Claim> {
-    return this.http.post<Claim>(`${this.baseUrl}/${id}/settle`, { comment });
+  /**
+   * The idempotency key must be generated once per user intent (e.g. per form) so that retries and
+   * double-clicks return the same claim instead of creating duplicates.
+   */
+  submit(request: CreateClaimRequest, idempotencyKey: string): Observable<Claim> {
+    return this.http.post<Claim>(this.baseUrl, request, {
+      headers: new HttpHeaders({ 'Idempotency-Key': idempotencyKey }),
+    });
+  }
+
+  update(id: string, request: UpdateClaimRequest): Observable<Claim> {
+    return this.http.put<Claim>(`${this.baseUrl}/${id}`, request);
+  }
+
+  provideInformation(id: string, response: string): Observable<Claim> {
+    return this.http.post<Claim>(`${this.baseUrl}/${id}/information`, { response });
   }
 
   withdraw(id: string, comment?: string): Observable<Claim> {
     return this.http.post<Claim>(`${this.baseUrl}/${id}/withdraw`, { comment });
+  }
+
+  assign(id: string, officerId?: string, comment?: string): Observable<Claim> {
+    return this.http.post<Claim>(`${this.baseUrl}/${id}/assign`, { officerId, comment });
+  }
+
+  assess(id: string, notes: string, recommendedAmount?: number | null): Observable<ClaimAssessment> {
+    return this.http.post<ClaimAssessment>(`${this.baseUrl}/${id}/assessments`, { notes, recommendedAmount });
+  }
+
+  requestInformation(id: string, message: string): Observable<Claim> {
+    return this.http.post<Claim>(`${this.baseUrl}/${id}/request-information`, { message });
+  }
+
+  approve(id: string, approvedAmount: number, comment?: string): Observable<Claim> {
+    return this.http.post<Claim>(`${this.baseUrl}/${id}/approve`, { approvedAmount, comment });
+  }
+
+  reject(id: string, reason: string): Observable<Claim> {
+    return this.http.post<Claim>(`${this.baseUrl}/${id}/reject`, { reason });
+  }
+
+  settle(id: string, request: SettleClaimRequest): Observable<Claim> {
+    return this.http.post<Claim>(`${this.baseUrl}/${id}/settle`, request);
+  }
+
+  changePriority(id: string, priority: ClaimPriority): Observable<Claim> {
+    return this.http.put<Claim>(`${this.baseUrl}/${id}/priority`, { priority });
   }
 }

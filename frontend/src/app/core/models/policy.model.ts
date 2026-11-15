@@ -1,4 +1,5 @@
-export type ProductType = 'MOTOR' | 'HEALTH' | 'TRAVEL' | 'PROPERTY';
+import { CurrencyCode, Market, ProductType } from './reference.model';
+
 export type PolicyStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 
 export interface Policy {
@@ -7,6 +8,8 @@ export interface Policy {
   holderId: string;
   holderName: string;
   productType: ProductType;
+  market: Market;
+  currency: CurrencyCode;
   coverageAmount: number;
   deductible: number;
   startDate: string;

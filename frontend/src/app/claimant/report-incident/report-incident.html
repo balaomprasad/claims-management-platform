@@ -1,0 +1,94 @@
+<div class="page-header">
+  <h1>Report an incident</h1>
+</div>
+
+<app-page-state
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="policies().length === 0"
+  emptyMessage="You have no active policies to claim against."
+  (retry)="loadPolicies()"
+>
+  <mat-card>
+    <mat-card-content>
+      <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack">
+        <mat-form-field appearance="outline">
+          <mat-label>Policy</mat-label>
+          <mat-select formControlName="policyId">
+            @for (policy of policies(); track policy.id) {
+              <mat-option [value]="policy.id">
+                {{ policy.policyNumber }} · {{ humanize(policy.productType) }} · {{ humanize(policy.market) }}
+              </mat-option>
+            }
+          </mat-select>
+          @if (selectedPolicy(); as policy) {
+            <mat-hint>
+              Coverage {{ policy.coverageAmount | currency: policy.currency : 'code' }} · valid
+              {{ policy.startDate }} to {{ policy.endDate }}
+            </mat-hint>
+          }
+          <mat-error>Select a policy</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Incident date</mat-label>
+          <input matInput type="date" formControlName="incidentDate" [max]="today" />
+          <mat-error>Incident date is required</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Where did it happen?</mat-label>
+          <input matInput formControlName="incidentLocation" maxlength="300" />
+          <mat-error>Location is required</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Estimated loss{{ selectedPolicy() ? ' (' + selectedPolicy()!.currency + ')' : '' }}</mat-label>
+          <input matInput type="number" min="0.01" step="0.01" formControlName="estimatedLoss" />
+          <mat-error>Enter an amount greater than 0</mat-error>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>What happened?</mat-label>
+          <textarea matInput rows="5" formControlName="incidentDescription" maxlength="2000"></textarea>
+          <mat-hint align="end">{{ form.controls.incidentDescription.value.length }} / 2000</mat-hint>
+          <mat-error>Description is required</mat-error>
+        </mat-form-field>
+
+        <section class="documents">
+          <h3>Supporting documents (optional)</h3>
+          <p class="muted">PDF, PNG or JPEG, up to 10 MB each. You can also add documents later.</p>
+          @for (doc of documents(); track $index) {
+            <div class="document-row">
+              <mat-icon>description</mat-icon>
+              <span class="name">{{ doc.file.name }}</span>
+              <mat-form-field appearance="outline" subscriptSizing="dynamic">
+                <mat-label>Type</mat-label>
+                <mat-select [value]="doc.type" (selectionChange)="setType($index, $event.value)">
+                  @for (type of documentTypes; track type) {
+                    <mat-option [value]="type">{{ humanize(type) }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <button mat-icon-button type="button" aria-label="Remove file" (click)="removeFile($index)">
+                <mat-icon>close</mat-icon>
+              </button>
+            </div>
+          }
+          @if (fileError()) {
+            <p class="error-text" role="alert">{{ fileError() }}</p>
+          }
+          <input #fileInput type="file" multiple hidden [accept]="accept" (change)="addFiles(fileInput)" />
+          <button mat-stroked-button type="button" (click)="fileInput.click()">
+            <mat-icon>attach_file</mat-icon> Add files
+          </button>
+        </section>
+
+        <div class="form-actions">
+          <a mat-button routerLink="/claimant">Cancel</a>
+          <button mat-flat-button type="submit" [disabled]="submitting()">Submit claim</button>
+        </div>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</app-page-state>

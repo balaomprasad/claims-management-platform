@@ -8,7 +8,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { map } from 'rxjs';
-import { Role } from '../../core/models/user.model';
+import { ROLE_LABELS, Role } from '../../core/models/user.model';
 import { AuthService } from '../../core/services/auth.service';
 
 interface NavItem {
@@ -19,8 +19,11 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Claims', icon: 'assignment', link: '/claims' },
-  { label: 'New claim', icon: 'add_circle', link: '/claims/new', roles: ['CLAIMANT'] },
+  { label: 'My claims', icon: 'dashboard', link: '/claimant', roles: ['CLAIMANT'] },
+  { label: 'Report incident', icon: 'add_circle', link: '/claimant/report', roles: ['CLAIMANT'] },
+  { label: 'Workspace', icon: 'work', link: '/officer', roles: ['CLAIMS_OFFICER'] },
+  { label: 'Dashboard', icon: 'insights', link: '/manager', roles: ['MANAGER'] },
+  { label: 'All claims', icon: 'assignment', link: '/claims', roles: ['CLAIMS_OFFICER', 'MANAGER', 'ADMIN'] },
   { label: 'Policies', icon: 'policy', link: '/policies' },
   { label: 'Notifications', icon: 'notifications', link: '/notifications' },
 ];
@@ -44,6 +47,7 @@ export class Shell {
   private readonly auth = inject(AuthService);
 
   protected readonly user = this.auth.currentUser;
+  protected readonly roleLabels = ROLE_LABELS;
   protected readonly isHandset = toSignal(
     inject(BreakpointObserver)
       .observe(Breakpoints.Handset)

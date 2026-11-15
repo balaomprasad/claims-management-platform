@@ -14,7 +14,10 @@ describe('roleGuard', () => {
         provideRouter([]),
         {
           provide: AuthService,
-          useValue: { hasRole: (...roles: Role[]) => currentRole !== null && roles.includes(currentRole) },
+          useValue: {
+            hasRole: (...roles: Role[]) => currentRole !== null && roles.includes(currentRole),
+            currentUser: () => (currentRole ? { id: 'u1', email: 'u@x.io', fullName: 'U', role: currentRole } : null),
+          },
         },
       ],
     });
@@ -32,10 +35,10 @@ describe('roleGuard', () => {
     expect(run(['CLAIMANT'])).toBe(true);
   });
 
-  it('redirects users without a permitted role to the claims list', () => {
-    currentRole = 'ADJUSTER';
+  it('redirects users without a permitted role to their own portal', () => {
+    currentRole = 'CLAIMS_OFFICER';
     const result = run(['CLAIMANT']);
     expect(result instanceof UrlTree).toBe(true);
-    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/claims');
+    expect(TestBed.inject(Router).serializeUrl(result as UrlTree)).toBe('/officer');
   });
 });

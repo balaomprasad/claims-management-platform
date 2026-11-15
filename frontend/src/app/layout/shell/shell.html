@@ -31,7 +31,7 @@
       <span class="brand">ClaimSphere</span>
       <span class="spacer"></span>
       @if (user(); as current) {
-        <span class="user">{{ current.fullName }} · {{ current.role }}</span>
+        <span class="user">{{ current.fullName }} · {{ roleLabels[current.role] }}</span>
       }
       <button mat-icon-button aria-label="Sign out" (click)="logout()">
         <mat-icon>logout</mat-icon>

@@ -1,4 +1,11 @@
-export type Role = 'CLAIMANT' | 'ADJUSTER' | 'ADMIN';
+export type Role = 'CLAIMANT' | 'CLAIMS_OFFICER' | 'MANAGER' | 'ADMIN';
+
+export const ROLE_LABELS: Record<Role, string> = {
+  CLAIMANT: 'Claimant',
+  CLAIMS_OFFICER: 'Claims officer',
+  MANAGER: 'Manager',
+  ADMIN: 'Administrator',
+};
 
 export interface User {
   id: string;
@@ -16,6 +23,8 @@ export interface RegisterRequest {
   email: string;
   password: string;
   fullName: string;
+  market: string;
+  phone?: string;
 }
 
 export interface LoginResponse {

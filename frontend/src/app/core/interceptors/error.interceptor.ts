@@ -35,3 +35,8 @@ export function describeError(error: HttpErrorResponse): string {
   const fieldErrors = problem?.fieldErrors?.map((e) => `${e.field}: ${e.message}`).join('; ');
   return fieldErrors || problem?.detail || problem?.title || `Request failed (${error.status})`;
 }
+
+/** Message for page-level error states. */
+export function toErrorMessage(error: unknown): string {
+  return error instanceof HttpErrorResponse ? describeError(error) : 'Something went wrong.';
+}
