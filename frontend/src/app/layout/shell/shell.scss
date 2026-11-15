@@ -1,0 +1,40 @@
+.container {
+  height: 100vh;
+}
+
+.sidenav {
+  width: 220px;
+}
+
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.brand {
+  font-weight: 600;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.user {
+  font-size: 14px;
+  margin-right: 8px;
+
+  @media (max-width: 599px) {
+    display: none;
+  }
+}
+
+.content {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.active {
+  background: var(--mat-sys-secondary-container);
+}

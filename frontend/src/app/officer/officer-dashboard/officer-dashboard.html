@@ -1,0 +1,38 @@
+<div class="page-header">
+  <h1>Officer workspace</h1>
+</div>
+
+<div class="kpi-grid">
+  <mat-card class="kpi"><span class="value">{{ mine().length }}</span><span class="label">My open claims</span></mat-card>
+  <mat-card class="kpi"><span class="value">{{ readyToDecide() }}</span><span class="label">Under review</span></mat-card>
+  <mat-card class="kpi"><span class="value">{{ awaitingInfo() }}</span><span class="label">Awaiting claimant</span></mat-card>
+  <mat-card class="kpi"><span class="value">{{ toSettle() }}</span><span class="label">Approved, to settle</span></mat-card>
+  <mat-card class="kpi"><span class="value">{{ queue().length }}</span><span class="label">Unassigned queue</span></mat-card>
+  <mat-card class="kpi" [class.attention]="overdue() > 0">
+    <span class="value">{{ overdue() }}</span><span class="label">Older than {{ threshold }} days</span>
+  </mat-card>
+</div>
+
+<app-page-state [loading]="loading()" [error]="error()" (retry)="load()">
+  <mat-tab-group mat-stretch-tabs="false">
+    <mat-tab [label]="'My claims (' + mine().length + ')'">
+      @if (mine().length === 0) {
+        <p class="muted pad">No open claims assigned to you. Pick one from the unassigned queue.</p>
+      } @else {
+        <app-claim-table [claims]="mine()" [columns]="mineColumns" (open)="open($event)" />
+      }
+    </mat-tab>
+    <mat-tab [label]="'Unassigned queue (' + queue().length + ')'">
+      @if (queue().length === 0) {
+        <p class="muted pad">The queue is empty.</p>
+      } @else {
+        <app-claim-table
+          [claims]="queue()"
+          [columns]="queueColumns"
+          (open)="open($event)"
+          (assign)="assignToMe($event)"
+        />
+      }
+    </mat-tab>
+  </mat-tab-group>
+</app-page-state>

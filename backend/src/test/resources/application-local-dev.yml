@@ -1,0 +1,19 @@
+# Used only by LocalDevApplication (test classpath) to run without Docker.
+spring:
+  datasource:
+    url: jdbc:h2:mem:claimsphere-dev;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+logging:
+  structured:
+    format:
+      console: ""
+  level:
+    org.apache.kafka: WARN
+    kafka: WARN
+    state.change.logger: WARN
+
+app:
+  kafka:
+    partitions: 1

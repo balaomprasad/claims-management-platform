@@ -1,0 +1,159 @@
+<app-page-state [loading]="loading() && !claim()" [error]="error()" (retry)="load()">
+  @if (claim(); as c) {
+    <div class="page-header">
+      <h1>
+        <a mat-icon-button routerLink="/" aria-label="Back"><mat-icon>arrow_back</mat-icon></a>
+        Claim {{ c.claimNumber }}
+      </h1>
+      <div class="chips">
+        <app-priority-chip [priority]="c.priority" />
+        <app-status-chip [status]="c.status" />
+      </div>
+    </div>
+
+    @if (c.status === 'INFO_REQUESTED' && user()?.role === 'CLAIMANT') {
+      <div class="banner" role="status">
+        <mat-icon>info</mat-icon>
+        <span>The claims officer needs more information. Upload documents and use "Provide information".</span>
+      </div>
+    }
+
+    <div class="layout">
+      <div class="main">
+        <mat-card>
+          <mat-card-content>
+            <dl class="details">
+              <dt>Policy</dt>
+              <dd>{{ c.policyNumber }}</dd>
+              <dt>Claim type</dt>
+              <dd>{{ humanize(c.claimType) }}</dd>
+              <dt>Market</dt>
+              <dd>{{ humanize(c.market) }} ({{ c.currency }})</dd>
+              <dt>Claimant</dt>
+              <dd>{{ c.claimantName }}</dd>
+              <dt>Claims officer</dt>
+              <dd>{{ c.assignedOfficerName ?? 'Unassigned' }}</dd>
+              <dt>Incident</dt>
+              <dd>{{ c.incidentDate | date: 'mediumDate' }}{{ c.incidentLocation ? ' · ' + c.incidentLocation : '' }}</dd>
+              <dt>Estimated loss</dt>
+              <dd>{{ c.estimatedLoss | currency: c.currency : 'code' }}</dd>
+              @if (c.approvedAmount !== null) {
+                <dt>Approved amount</dt>
+                <dd>{{ c.approvedAmount | currency: c.currency : 'code' }}</dd>
+              }
+              @if (c.settledAmount !== null) {
+                <dt>Settled</dt>
+                <dd>
+                  {{ c.settledAmount | currency: c.currency : 'code' }} on {{ c.settlementDate | date: 'mediumDate' }}
+                  @if (c.settlementReference) {
+                    (ref {{ c.settlementReference }})
+                  }
+                </dd>
+              }
+              <dt>Submitted</dt>
+              <dd>{{ c.createdAt | date: 'medium' }} · {{ ageDays() }} day(s) {{ c.closedAt ? 'to close' : 'old' }}</dd>
+            </dl>
+            <h3>What happened</h3>
+            <p class="description">{{ c.incidentDescription }}</p>
+          </mat-card-content>
+        </mat-card>
+
+        @if (decision(); as d) {
+          <mat-card [class]="'decision ' + d.outcome.toLowerCase()">
+            <mat-card-header>
+              <mat-card-title>Decision: {{ humanize(d.outcome) }}</mat-card-title>
+              <mat-card-subtitle>{{ d.decidedByName }} · {{ d.decidedAt | date: 'medium' }}</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              @if (d.amount !== null) {
+                <p>Approved amount: <strong>{{ d.amount | currency: c.currency : 'code' }}</strong></p>
+              }
+              @if (d.reason) {
+                <p>{{ d.outcome === 'REJECTED' ? 'Reason' : 'Comment' }}: {{ d.reason }}</p>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (infoRequests().length > 0) {
+          <mat-card>
+            <mat-card-header><mat-card-title>Information requests</mat-card-title></mat-card-header>
+            <mat-card-content>
+              @for (r of infoRequests(); track r.id) {
+                <div class="exchange">
+                  <p><strong>{{ r.requestedByName }}</strong> · {{ r.requestedAt | date: 'short' }}</p>
+                  <p>{{ r.message }}</p>
+                  @if (r.response) {
+                    <p class="response">
+                      <strong>{{ r.respondedByName }}</strong> · {{ r.respondedAt | date: 'short' }}<br />
+                      {{ r.response }}
+                    </p>
+                  } @else {
+                    <p class="muted">Awaiting response</p>
+                  }
+                </div>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        @if (isStaff) {
+          <mat-card>
+            <mat-card-header>
+              <mat-card-title>Assessment notes</mat-card-title>
+              <mat-card-subtitle>Internal, not visible to the claimant</mat-card-subtitle>
+            </mat-card-header>
+            <mat-card-content>
+              @for (a of assessments(); track a.id) {
+                <div class="exchange">
+                  <p>
+                    <strong>{{ a.officerName }}</strong> · {{ a.createdAt | date: 'short' }}
+                    @if (a.recommendedAmount !== null) {
+                      · recommends {{ a.recommendedAmount | currency: c.currency : 'code' }}
+                    }
+                  </p>
+                  <p class="description">{{ a.notes }}</p>
+                </div>
+              } @empty {
+                <p class="muted">No assessment recorded yet.</p>
+              }
+            </mat-card-content>
+          </mat-card>
+        }
+
+        <app-claim-documents [claimId]="c.id" [canUpload]="canUpload()" />
+      </div>
+
+      <aside class="side">
+        @if (actions().length > 0) {
+          <app-claim-action-panel
+            [claim]="c"
+            [actions]="actions()"
+            [officers]="officers()"
+            [needsOfficerChoice]="canChooseOfficer"
+            [busy]="busy()"
+            (actionStarted)="onActionStarted($event)"
+            (command)="execute($event)"
+          />
+        }
+
+        <mat-card>
+          <mat-card-header><mat-card-title>Timeline</mat-card-title></mat-card-header>
+          <mat-card-content>
+            <ol class="timeline">
+              @for (entry of history(); track entry.id) {
+                <li>
+                  <app-status-chip [status]="entry.toStatus" />
+                  <div class="meta">{{ entry.changedByName }} · {{ entry.changedAt | date: 'short' }}</div>
+                  @if (entry.comment) {
+                    <div class="comment">{{ entry.comment }}</div>
+                  }
+                </li>
+              }
+            </ol>
+          </mat-card-content>
+        </mat-card>
+      </aside>
+    </div>
+  }
+</app-page-state>

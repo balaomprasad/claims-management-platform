@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: claimsphere
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - postgres.yaml
+  - kafka.yaml
+  - backend-storage.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
+  - ingress.yaml
+
+# Secrets come from a git-ignored file: cp secrets.env.example secrets.env, then replace every value.
+secretGenerator:
+  - name: claimsphere-secrets
+    envs:
+      - secrets.env
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  - name: claimsphere-backend
+    newTag: latest
+  - name: claimsphere-frontend
+    newTag: latest

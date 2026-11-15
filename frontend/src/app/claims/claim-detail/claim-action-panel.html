@@ -1,0 +1,141 @@
+<mat-card>
+  <mat-card-header><mat-card-title>Actions</mat-card-title></mat-card-header>
+  <mat-card-content>
+    @if (active(); as action) {
+      <div class="form-stack">
+        <h3 class="action-title">{{ labels[action] }}</h3>
+        @switch (action) {
+          @case ('assign') {
+            @if (needsOfficerChoice()) {
+              <mat-form-field appearance="outline">
+                <mat-label>Claims officer</mat-label>
+                <mat-select [(ngModel)]="officerId">
+                  @for (o of officers(); track o.id) {
+                    <mat-option [value]="o.id">{{ o.fullName }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            } @else {
+              <p>Assign this claim to yourself and start the review?</p>
+            }
+          }
+          @case ('reassign') {
+            <mat-form-field appearance="outline">
+              <mat-label>New claims officer</mat-label>
+              <mat-select [(ngModel)]="officerId">
+                @for (o of officers(); track o.id) {
+                  @if (o.id !== claim().assignedOfficerId) {
+                    <mat-option [value]="o.id">{{ o.fullName }}</mat-option>
+                  }
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+          @case ('assess') {
+            <mat-form-field appearance="outline">
+              <mat-label>Assessment notes (internal)</mat-label>
+              <textarea matInput rows="4" maxlength="4000" [(ngModel)]="text"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Recommended amount ({{ claim().currency }}, optional)</mat-label>
+              <input matInput type="number" min="0" step="0.01" [(ngModel)]="amount" />
+            </mat-form-field>
+          }
+          @case ('requestInfo') {
+            <mat-form-field appearance="outline">
+              <mat-label>What do you need from the claimant?</mat-label>
+              <textarea matInput rows="3" maxlength="2000" [(ngModel)]="text"></textarea>
+            </mat-form-field>
+          }
+          @case ('approve') {
+            <mat-form-field appearance="outline">
+              <mat-label>Approved amount ({{ claim().currency }})</mat-label>
+              <input matInput type="number" min="0.01" step="0.01" [max]="claim().estimatedLoss" [(ngModel)]="amount" />
+              <mat-hint>Up to {{ claim().estimatedLoss | currency: claim().currency : 'code' }}</mat-hint>
+            </mat-form-field>
+          }
+          @case ('reject') {
+            <mat-form-field appearance="outline">
+              <mat-label>Reason (shared with the claimant)</mat-label>
+              <textarea matInput rows="3" maxlength="1000" [(ngModel)]="text"></textarea>
+            </mat-form-field>
+          }
+          @case ('settle') {
+            <mat-form-field appearance="outline">
+              <mat-label>Settled amount ({{ claim().currency }})</mat-label>
+              <input matInput type="number" min="0.01" step="0.01" [max]="claim().approvedAmount" [(ngModel)]="amount" />
+              <mat-hint>Up to the approved {{ claim().approvedAmount | currency: claim().currency : 'code' }}</mat-hint>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Settlement date</mat-label>
+              <input matInput type="date" [max]="today" [(ngModel)]="date" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Payment reference (optional)</mat-label>
+              <input matInput maxlength="100" [(ngModel)]="reference" />
+            </mat-form-field>
+          }
+          @case ('priority') {
+            <mat-form-field appearance="outline">
+              <mat-label>Priority</mat-label>
+              <mat-select [(ngModel)]="priority">
+                @for (p of priorities; track p) {
+                  <mat-option [value]="p">{{ humanize(p) }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+          @case ('edit') {
+            <mat-form-field appearance="outline">
+              <mat-label>Location</mat-label>
+              <input matInput maxlength="300" [(ngModel)]="location" />
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Description</mat-label>
+              <textarea matInput rows="4" maxlength="2000" [(ngModel)]="text"></textarea>
+            </mat-form-field>
+            <mat-form-field appearance="outline">
+              <mat-label>Estimated loss ({{ claim().currency }})</mat-label>
+              <input matInput type="number" min="0.01" step="0.01" [(ngModel)]="amount" />
+            </mat-form-field>
+          }
+          @case ('provideInfo') {
+            <mat-form-field appearance="outline">
+              <mat-label>Your response</mat-label>
+              <textarea matInput rows="4" maxlength="4000" [(ngModel)]="text"></textarea>
+              <mat-hint>Upload any requested documents in the Documents section first.</mat-hint>
+            </mat-form-field>
+          }
+          @case ('withdraw') {
+            <p>Withdrawing closes the claim permanently.</p>
+          }
+        }
+        @if (action === 'assign' || action === 'reassign' || action === 'approve' || action === 'withdraw') {
+          <mat-form-field appearance="outline">
+            <mat-label>Comment (optional)</mat-label>
+            <textarea matInput rows="2" maxlength="1000" [(ngModel)]="comment"></textarea>
+          </mat-form-field>
+        }
+        <div class="form-actions">
+          <button mat-button type="button" (click)="cancel()">Cancel</button>
+          <button mat-flat-button type="button" [disabled]="busy() || !isValid()" (click)="confirm()">
+            Confirm
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div class="action-buttons">
+        @for (action of actions(); track action) {
+          <button
+            mat-stroked-button
+            type="button"
+            [class.danger]="action === 'reject' || action === 'withdraw'"
+            (click)="start(action)"
+          >
+            {{ labels[action] }}
+          </button>
+        }
+      </div>
+    }
+  </mat-card-content>
+</mat-card>

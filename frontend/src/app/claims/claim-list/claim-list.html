@@ -1,0 +1,64 @@
+<div class="page-header">
+  <h1>{{ isClaimant ? 'My claims' : 'Claims' }}</h1>
+</div>
+
+<form class="filters" [formGroup]="filters" aria-label="Claim filters">
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Status</mat-label>
+    <mat-select formControlName="status">
+      <mat-option value="">Any</mat-option>
+      @for (s of statuses; track s) {
+        <mat-option [value]="s">{{ humanize(s) }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Claim type</mat-label>
+    <mat-select formControlName="claimType">
+      <mat-option value="">Any</mat-option>
+      @for (t of types; track t) {
+        <mat-option [value]="t">{{ humanize(t) }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  @if (!isClaimant) {
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Market</mat-label>
+      <mat-select formControlName="market">
+        <mat-option value="">Any</mat-option>
+        @for (m of markets; track m) {
+          <mat-option [value]="m">{{ humanize(m) }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Priority</mat-label>
+      <mat-select formControlName="priority">
+        <mat-option value="">Any</mat-option>
+        @for (p of priorities; track p) {
+          <mat-option [value]="p">{{ humanize(p) }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+    <mat-checkbox formControlName="unassigned">Unassigned only</mat-checkbox>
+  }
+  <mat-checkbox formControlName="openOnly">Open only</mat-checkbox>
+</form>
+
+<app-page-state
+  [loading]="loading()"
+  [error]="error()"
+  [empty]="claims().length === 0"
+  emptyMessage="No claims match the filters."
+  (retry)="load()"
+>
+  <app-claim-table [claims]="claims()" [columns]="columns" (open)="open($event)" />
+</app-page-state>
+
+<mat-paginator
+  [length]="total()"
+  [pageIndex]="pageIndex()"
+  [pageSize]="pageSize()"
+  [pageSizeOptions]="[10, 20, 50, 100]"
+  (page)="onPage($event)"
+/>
