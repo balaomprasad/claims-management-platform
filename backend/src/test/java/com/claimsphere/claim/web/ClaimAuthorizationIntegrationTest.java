@@ -155,6 +155,18 @@ class ClaimAuthorizationIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void officerDirectoryIsAvailableToManagersOnly() throws Exception {
+        mockMvc.perform(get("/api/v1/users/officers").header("Authorization", manager.bearer()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.id == '%s')].role".formatted(officer.id())).value("CLAIMS_OFFICER"))
+                .andExpect(jsonPath("$[?(@.role != 'CLAIMS_OFFICER')]").isEmpty());
+        mockMvc.perform(get("/api/v1/users/officers").header("Authorization", officer.bearer()))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/api/v1/users/officers").header("Authorization", claimant.bearer()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void unknownClaimReturns404AndMalformedIdReturns400() throws Exception {
         mockMvc.perform(get("/api/v1/claims/{id}", "00000000-0000-0000-0000-000000000000")
                         .header("Authorization", admin.bearer()))

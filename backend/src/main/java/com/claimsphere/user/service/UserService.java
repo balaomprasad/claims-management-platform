@@ -100,7 +100,7 @@ public class UserService {
     }
 
     /**
-     * Loads a user and verifies they hold the expected role, e.g. when assigning a claim to an adjuster.
+     * Loads a user and verifies they hold the expected role, e.g. when assigning a claim to a claims officer.
      */
     @Transactional(readOnly = true)
     public User getUserWithRole(UUID userId, Role expectedRole) {

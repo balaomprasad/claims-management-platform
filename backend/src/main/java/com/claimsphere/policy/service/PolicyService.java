@@ -62,7 +62,7 @@ public class PolicyService {
     }
 
     /**
-     * Claimants see only their own policies; adjusters and admins see all.
+     * Claimants see only their own policies; claims staff and admins see all.
      */
     @Transactional(readOnly = true)
     public Page<PolicyResponse> listPolicies(CurrentUser currentUser, Pageable pageable) {
