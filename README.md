@@ -30,6 +30,7 @@ More documentation:
 - [API](docs/api-documentation.md)
 - [Database design](docs/database-design.md)
 - [Demo walkthrough](docs/walkthrough.md)
+- [Presentation guide: flows, database checks, test cases](docs/presentation-guide.md)
 - [Architecture decision records](docs/adr)
 - [AI working journal](ai-journal/AI_WORKING_JOURNAL.md)
 
@@ -162,6 +163,8 @@ $env:JWT_SECRET = "<at least 32 random characters>"
 $env:DEMO_PASSWORD = "<choose a demo password>"
 ./mvnw spring-boot:test-run
 ```
+
+To inspect the in-memory database, open the H2 console at http://localhost:8082 (localhost only). Use JDBC URL `jdbc:h2:mem:claimsphere-dev;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1`, user `sa`, and an empty password. Sample queries are in the [presentation guide](docs/presentation-guide.md#56-useful-queries-for-the-demo).
 
 **Option B: real PostgreSQL and Kafka.**
 

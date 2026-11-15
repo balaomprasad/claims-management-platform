@@ -155,6 +155,26 @@ The browser automation had coordinate problems after viewport resizes. These wer
 
 ---
 
+## Session 8: Client presentation guide and manual database access
+
+### Prompt given
+"I want to understand the project end to end to present it to the client: the tech stack in each phase, flow diagrams for frontend and backend, how the database is connected so I can check it manually, walked through as test cases."
+
+### Accepted
+- `docs/presentation-guide.md`: tech stack by phase; Mermaid diagrams for the frontend structure, request/interceptor flow and login; backend modules, the "approve" request lifecycle and the outbox-to-notification flow; database connection path, ER diagram, demo SQL; 30+ test cases with expected HTTP codes and database checks.
+- The Docker-free launcher (`LocalDevApplication`, test classpath only) now starts the H2 web console on `localhost:8082`, so the in-memory database can be inspected by hand.
+
+### Verification
+- Every API test case in the guide was executed against the running app: 26 checks, all matching the documented status codes.
+- The history, audit, outbox and notification queries were run in the H2 console for the claim created in that run (6 history rows, 7 audit rows, 6 published outbox events, 7 notifications).
+- UI authentication cases (redirect when logged out, wrong-password snackbar, role landing pages, role guard redirect) were checked in the browser.
+
+### Corrected by checking
+- While writing the guide, the AI found that **optimistic locking has no automated test**, although it had been described as tested. The guide and this journal now say so. Its 409 mapping exists in `GlobalExceptionHandler`.
+- The dead-letter test name in the first draft of the guide was wrong; it was fixed to `ClaimEventConsumerFailureIntegrationTest`.
+
+---
+
 ## Final reflection
 
 **What I built.** A modular-monolith claims platform:
@@ -166,7 +186,7 @@ The browser automation had coordinate problems after viewport resizes. These wer
 - Outbox-based Kafka events with an idempotent consumer, retries and a DLT.
 - Docker, Compose and Kubernetes deployment assets, plus CI.
 
-**What I prioritised.** Backend correctness and authorisation first: an explicit state machine, ownership checks, assigned-officer checks, optimistic locking and idempotency, each covered by tests. The UI came after.
+**What I prioritised.** Backend correctness and authorisation first: an explicit state machine, ownership checks, assigned-officer checks and idempotency, each covered by tests, plus optimistic locking (mapped to 409, not yet covered by a concurrency test). The UI came after.
 
 **What I intentionally left out:**
 - Refresh tokens and rate limiting
