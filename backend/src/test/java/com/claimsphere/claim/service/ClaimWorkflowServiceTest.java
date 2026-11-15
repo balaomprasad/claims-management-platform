@@ -1,5 +1,6 @@
 package com.claimsphere.claim.service;
 
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.claim.domain.Claim;
 import com.claimsphere.claim.domain.ClaimStatus;
 import com.claimsphere.claim.dto.ApproveClaimRequest;
@@ -67,6 +68,8 @@ class ClaimWorkflowServiceTest {
     private ClaimLookup claimLookup;
     @Mock
     private ClaimTransitionRecorder recorder;
+    @Mock
+    private AuditService auditService;
 
     private ClaimWorkflowService service;
     private User officer;
@@ -78,7 +81,7 @@ class ClaimWorkflowServiceTest {
     void setUp() {
         service = new ClaimWorkflowService(claimRepository, assignmentRepository, assessmentRepository,
                 decisionRepository, informationRequestRepository, userService, claimLookup, new ClaimAccessPolicy(),
-                recorder, CLOCK);
+                recorder, auditService, CLOCK);
         User claimant = user(Role.CLAIMANT);
         officer = user(Role.CLAIMS_OFFICER);
         otherOfficer = user(Role.CLAIMS_OFFICER);

@@ -1,10 +1,13 @@
 package com.claimsphere.claim.service;
 
+import com.claimsphere.audit.domain.AuditAction;
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.claim.domain.Claim;
 import com.claimsphere.claim.domain.ClaimAssessment;
 import com.claimsphere.claim.domain.ClaimAssignment;
 import com.claimsphere.claim.domain.ClaimDecision;
 import com.claimsphere.claim.domain.ClaimInformationRequest;
+import com.claimsphere.claim.domain.ClaimPriority;
 import com.claimsphere.claim.domain.ClaimStatus;
 import com.claimsphere.claim.dto.ApproveClaimRequest;
 import com.claimsphere.claim.dto.AssessClaimRequest;
@@ -56,6 +59,7 @@ public class ClaimWorkflowService {
     private final ClaimLookup claimLookup;
     private final ClaimAccessPolicy accessPolicy;
     private final ClaimTransitionRecorder recorder;
+    private final AuditService auditService;
     private final Clock clock;
 
     public ClaimWorkflowService(ClaimRepository claimRepository, ClaimAssignmentRepository assignmentRepository,
@@ -63,7 +67,7 @@ public class ClaimWorkflowService {
                                 ClaimDecisionRepository decisionRepository,
                                 ClaimInformationRequestRepository informationRequestRepository,
                                 UserService userService, ClaimLookup claimLookup, ClaimAccessPolicy accessPolicy,
-                                ClaimTransitionRecorder recorder, Clock clock) {
+                                ClaimTransitionRecorder recorder, AuditService auditService, Clock clock) {
         this.claimRepository = claimRepository;
         this.assignmentRepository = assignmentRepository;
         this.assessmentRepository = assessmentRepository;
@@ -73,6 +77,7 @@ public class ClaimWorkflowService {
         this.claimLookup = claimLookup;
         this.accessPolicy = accessPolicy;
         this.recorder = recorder;
+        this.auditService = auditService;
         this.clock = clock;
     }
 
@@ -114,6 +119,8 @@ public class ClaimWorkflowService {
         ClaimAssessment assessment = assessmentRepository.save(new ClaimAssessment(claim,
                 userService.getReference(user.id()), request.notes().trim(), request.recommendedAmount(),
                 clock.instant()));
+        auditService.record(user.id(), AuditAction.CLAIM_ASSESSED, ClaimTransitionRecorder.ENTITY_TYPE, claimId,
+                request.recommendedAmount() == null ? null : "Recommended " + request.recommendedAmount());
         log.info("Assessment recorded claimId={} assessmentId={}", claimId, assessment.getId());
         return ClaimAssessmentResponse.from(assessment);
     }
@@ -184,8 +191,11 @@ public class ClaimWorkflowService {
 
     public ClaimResponse changePriority(UUID claimId, ChangePriorityRequest request, CurrentUser user) {
         Claim claim = claimLookup.loadVisible(claimId, user);
+        ClaimPriority previous = claim.getPriority();
         claim.changePriority(request.priority());
         claimRepository.saveAndFlush(claim);
+        auditService.record(user.id(), AuditAction.CLAIM_PRIORITY_CHANGED, ClaimTransitionRecorder.ENTITY_TYPE,
+                claimId, previous + " -> " + request.priority());
         log.info("Claim priority changed claimId={} priority={}", claimId, request.priority());
         return ClaimResponse.from(claim);
     }

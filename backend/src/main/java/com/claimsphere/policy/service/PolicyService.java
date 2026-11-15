@@ -1,5 +1,7 @@
 package com.claimsphere.policy.service;
 
+import com.claimsphere.audit.domain.AuditAction;
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.common.domain.CurrencyCode;
 import com.claimsphere.common.exception.BusinessRuleException;
 import com.claimsphere.common.exception.ResourceNotFoundException;
@@ -29,10 +31,12 @@ public class PolicyService {
 
     private final PolicyRepository policyRepository;
     private final UserService userService;
+    private final AuditService auditService;
 
-    public PolicyService(PolicyRepository policyRepository, UserService userService) {
+    public PolicyService(PolicyRepository policyRepository, UserService userService, AuditService auditService) {
         this.policyRepository = policyRepository;
         this.userService = userService;
+        this.auditService = auditService;
     }
 
     @Transactional
@@ -50,6 +54,9 @@ public class PolicyService {
                 request.coverageAmount().setScale(2, RoundingMode.HALF_UP),
                 request.deductible().setScale(2, RoundingMode.HALF_UP),
                 request.startDate(), request.endDate()));
+        auditService.record(AuditAction.POLICY_CREATED, "POLICY", policy.getId(),
+                "%s %s %s %s".formatted(policy.getPolicyNumber(), policy.getProductType(), policy.getMarket(),
+                        policy.getCurrency()));
         log.info("Policy created policyId={} holderId={}", policy.getId(), holder.getId());
         return PolicyResponse.from(policy);
     }

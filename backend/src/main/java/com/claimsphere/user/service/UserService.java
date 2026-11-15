@@ -1,5 +1,7 @@
 package com.claimsphere.user.service;
 
+import com.claimsphere.audit.domain.AuditAction;
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.common.domain.Market;
 import com.claimsphere.common.exception.BusinessRuleException;
 import com.claimsphere.common.exception.ConflictException;
@@ -35,12 +37,14 @@ public class UserService {
     private final UserRepository userRepository;
     private final ClaimantProfileRepository claimantProfileRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuditService auditService;
 
     public UserService(UserRepository userRepository, ClaimantProfileRepository claimantProfileRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder, AuditService auditService) {
         this.userRepository = userRepository;
         this.claimantProfileRepository = claimantProfileRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditService = auditService;
     }
 
     /**
@@ -72,6 +76,7 @@ public class UserService {
         }
         User user = userRepository.save(
                 new User(normalisedEmail, passwordEncoder.encode(rawPassword), fullName.trim(), role));
+        auditService.record(AuditAction.USER_CREATED, "USER", user.getId(), "role " + role);
         log.info("User created userId={} role={}", user.getId(), role);
         return user;
     }
@@ -120,6 +125,7 @@ public class UserService {
     public ClaimantProfileResponse updateClaimantProfile(UUID userId, ClaimantProfileRequest request) {
         ClaimantProfile profile = loadProfile(userId);
         profile.update(request.market(), blankToNull(request.phone()), blankToNull(request.address()));
+        auditService.record(userId, AuditAction.CLAIMANT_PROFILE_UPDATED, "USER", userId, null);
         return ClaimantProfileResponse.from(getUser(userId), profile);
     }
 

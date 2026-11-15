@@ -1,5 +1,6 @@
 package com.claimsphere.user.service;
 
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.common.domain.Market;
 import com.claimsphere.common.exception.ConflictException;
 import com.claimsphere.security.JwtTokenService;
@@ -40,14 +41,19 @@ class AuthServiceTest {
     @Mock
     private ClaimantProfileRepository claimantProfileRepository;
 
+    @Mock
+    private AuditService auditService;
+
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
-        UserService userService = new UserService(userRepository, claimantProfileRepository, passwordEncoder);
-        authService = new AuthService(userService, userRepository, passwordEncoder, jwtTokenService);
+        UserService userService = new UserService(userRepository, claimantProfileRepository, passwordEncoder,
+                auditService);
+        authService = new AuthService(userService, userRepository, passwordEncoder, jwtTokenService,
+                auditService);
     }
 
     @Test

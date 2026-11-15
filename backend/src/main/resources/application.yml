@@ -23,12 +23,9 @@ spring:
     # Default matches the host-facing listener exposed by docker-compose.yml.
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
     producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
       acks: all
       properties:
         enable.idempotence: true
-        spring.json.add.type.headers: false
     consumer:
       group-id: claimsphere-notifications
       auto-offset-reset: earliest
@@ -58,6 +55,9 @@ logging:
   structured:
     format:
       console: ${LOG_FORMAT:ecs}
+  # Used when structured logging is disabled (LOG_FORMAT empty); ECS output includes MDC values automatically.
+  pattern:
+    level: "%5p [%X{correlationId:-}]"
 
 springdoc:
   swagger-ui:
@@ -74,6 +74,9 @@ app:
     claim-events-topic: claimsphere.claim-events
     partitions: ${KAFKA_TOPIC_PARTITIONS:3}
     replicas: ${KAFKA_TOPIC_REPLICAS:1}
+  outbox:
+    poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+    batch-size: 50
   demo:
     # Shared password for all seeded demo accounts (demo profile only). Nothing is seeded when blank.
     password: ${DEMO_PASSWORD:}

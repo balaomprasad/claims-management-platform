@@ -1,5 +1,7 @@
 package com.claimsphere.user.service;
 
+import com.claimsphere.audit.domain.AuditAction;
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.security.JwtTokenService;
 import com.claimsphere.user.domain.User;
 import com.claimsphere.user.dto.LoginRequest;
@@ -29,14 +31,17 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
+    private final AuditService auditService;
     private final String dummyPasswordHash;
 
     public AuthService(UserService userService, UserRepository userRepository,
-                       PasswordEncoder passwordEncoder, JwtTokenService jwtTokenService) {
+                       PasswordEncoder passwordEncoder, JwtTokenService jwtTokenService,
+                       AuditService auditService) {
         this.userService = userService;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenService = jwtTokenService;
+        this.auditService = auditService;
         this.dummyPasswordHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
@@ -50,7 +55,7 @@ public class AuthService {
         return UserResponse.from(user);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public LoginResponse login(LoginRequest request) {
         Optional<User> user = userRepository.findByEmail(UserService.normaliseEmail(request.email()));
         // Always run a hash comparison so response timing does not reveal whether the email exists.
@@ -61,6 +66,7 @@ public class AuthService {
             throw new BadCredentialsException("Invalid email or password");
         }
         User authenticated = user.get();
+        auditService.record(authenticated.getId(), AuditAction.USER_LOGIN, "USER", authenticated.getId(), null);
         log.info("User logged in userId={}", authenticated.getId());
         return LoginResponse.bearer(jwtTokenService.issueToken(authenticated),
                 jwtTokenService.expiresInSeconds(), UserResponse.from(authenticated));

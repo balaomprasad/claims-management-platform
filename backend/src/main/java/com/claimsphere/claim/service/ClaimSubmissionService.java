@@ -1,5 +1,7 @@
 package com.claimsphere.claim.service;
 
+import com.claimsphere.audit.domain.AuditAction;
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.claim.domain.Claim;
 import com.claimsphere.claim.domain.ClaimStatus;
 import com.claimsphere.claim.dto.ClaimActionRequest;
@@ -46,13 +48,14 @@ public class ClaimSubmissionService {
     private final ClaimAccessPolicy accessPolicy;
     private final ClaimNumberGenerator claimNumberGenerator;
     private final ClaimTransitionRecorder recorder;
+    private final AuditService auditService;
     private final Clock clock;
 
     public ClaimSubmissionService(ClaimRepository claimRepository,
                                   ClaimInformationRequestRepository informationRequestRepository,
                                   PolicyService policyService, UserService userService, ClaimLookup claimLookup,
                                   ClaimAccessPolicy accessPolicy, ClaimNumberGenerator claimNumberGenerator,
-                                  ClaimTransitionRecorder recorder, Clock clock) {
+                                  ClaimTransitionRecorder recorder, AuditService auditService, Clock clock) {
         this.claimRepository = claimRepository;
         this.informationRequestRepository = informationRequestRepository;
         this.policyService = policyService;
@@ -61,6 +64,7 @@ public class ClaimSubmissionService {
         this.accessPolicy = accessPolicy;
         this.claimNumberGenerator = claimNumberGenerator;
         this.recorder = recorder;
+        this.auditService = auditService;
         this.clock = clock;
     }
 
@@ -101,6 +105,8 @@ public class ClaimSubmissionService {
         claim.updateDetails(request.incidentLocation().trim(), request.incidentDescription().trim(),
                 request.estimatedLoss());
         claimRepository.saveAndFlush(claim);
+        auditService.record(user.id(), AuditAction.CLAIM_UPDATED, ClaimTransitionRecorder.ENTITY_TYPE, claimId,
+                "Estimated loss " + claim.getEstimatedLoss());
         log.info("Claim details updated claimId={}", claimId);
         return ClaimResponse.from(claim);
     }

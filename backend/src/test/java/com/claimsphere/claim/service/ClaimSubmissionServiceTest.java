@@ -1,5 +1,6 @@
 package com.claimsphere.claim.service;
 
+import com.claimsphere.audit.service.AuditService;
 import com.claimsphere.claim.domain.Claim;
 import com.claimsphere.claim.dto.CreateClaimRequest;
 import com.claimsphere.claim.event.ClaimEventType;
@@ -60,6 +61,8 @@ class ClaimSubmissionServiceTest {
     private ClaimNumberGenerator claimNumberGenerator;
     @Mock
     private ClaimTransitionRecorder recorder;
+    @Mock
+    private AuditService auditService;
 
     private ClaimSubmissionService service;
     private User claimant;
@@ -68,7 +71,7 @@ class ClaimSubmissionServiceTest {
     @BeforeEach
     void setUp() {
         service = new ClaimSubmissionService(claimRepository, informationRequestRepository, policyService,
-                userService, claimLookup, new ClaimAccessPolicy(), claimNumberGenerator, recorder, CLOCK);
+                userService, claimLookup, new ClaimAccessPolicy(), claimNumberGenerator, recorder, auditService, CLOCK);
         claimant = new User("casey@example.com", "hash", "Casey", Role.CLAIMANT);
         ReflectionTestUtils.setField(claimant, "id", UUID.randomUUID());
         policy = new Policy("POL-1", claimant, ProductType.MOTOR, Market.SINGAPORE, CurrencyCode.SGD,
