@@ -1,0 +1,54 @@
+<div class="page-header">
+  <h1>File a new claim</h1>
+</div>
+
+<mat-card>
+  <mat-card-content>
+    @if (policies().length === 0) {
+      <p class="muted">You have no active policies to claim against.</p>
+    }
+    <form [formGroup]="form" (ngSubmit)="submit()" class="form-stack">
+      <mat-form-field appearance="outline">
+        <mat-label>Policy</mat-label>
+        <mat-select formControlName="policyId">
+          @for (policy of policies(); track policy.id) {
+            <mat-option [value]="policy.id">
+              {{ policy.policyNumber }} · {{ policy.productType }}
+            </mat-option>
+          }
+        </mat-select>
+        @if (selectedPolicy(); as policy) {
+          <mat-hint>
+            Coverage {{ policy.coverageAmount | number: '1.2-2' }} · valid {{ policy.startDate }} to
+            {{ policy.endDate }}
+          </mat-hint>
+        }
+        <mat-error>Select a policy</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Incident date</mat-label>
+        <input matInput type="date" formControlName="incidentDate" [max]="today" />
+        <mat-error>Incident date is required</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Claimed amount</mat-label>
+        <input matInput type="number" min="0.01" step="0.01" formControlName="claimedAmount" />
+        <mat-error>Enter an amount greater than 0</mat-error>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>What happened?</mat-label>
+        <textarea matInput rows="5" formControlName="description" maxlength="2000"></textarea>
+        <mat-hint align="end">{{ form.controls.description.value.length }} / 2000</mat-hint>
+        <mat-error>Description is required</mat-error>
+      </mat-form-field>
+
+      <div class="form-actions">
+        <a mat-button routerLink="/claims">Cancel</a>
+        <button mat-flat-button type="submit" [disabled]="submitting()">Submit claim</button>
+      </div>
+    </form>
+  </mat-card-content>
+</mat-card>

@@ -1,0 +1,124 @@
+<div class="page-header">
+  <h1>
+    <a mat-icon-button routerLink="/claims" aria-label="Back to claims"><mat-icon>arrow_back</mat-icon></a>
+    Claim {{ claim()?.claimNumber }}
+  </h1>
+  @if (claim(); as c) {
+    <app-status-chip [status]="c.status" />
+  }
+</div>
+
+@if (claim(); as c) {
+  <div class="layout">
+    <mat-card class="details">
+      <mat-card-content>
+        <dl>
+          <dt>Policy</dt>
+          <dd>{{ c.policyNumber }}</dd>
+          <dt>Claimant</dt>
+          <dd>{{ c.claimantName }}</dd>
+          <dt>Assigned adjuster</dt>
+          <dd>{{ c.assignedAdjusterName ?? 'Unassigned' }}</dd>
+          <dt>Incident date</dt>
+          <dd>{{ c.incidentDate | date: 'mediumDate' }}</dd>
+          <dt>Claimed amount</dt>
+          <dd>{{ c.claimedAmount | number: '1.2-2' }}</dd>
+          @if (c.approvedAmount !== null) {
+            <dt>Approved amount</dt>
+            <dd>{{ c.approvedAmount | number: '1.2-2' }}</dd>
+          }
+          @if (c.rejectionReason) {
+            <dt>Rejection reason</dt>
+            <dd>{{ c.rejectionReason }}</dd>
+          }
+          <dt>Submitted</dt>
+          <dd>{{ c.createdAt | date: 'medium' }}</dd>
+        </dl>
+        <h3>Description</h3>
+        <p class="description">{{ c.description }}</p>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="side">
+      @if (actions().length > 0) {
+        <mat-card>
+          <mat-card-header><mat-card-title>Actions</mat-card-title></mat-card-header>
+          <mat-card-content>
+            @if (activeAction(); as action) {
+              <div class="form-stack">
+                @switch (action) {
+                  @case ('assign') {
+                    @if (isAdmin) {
+                      <mat-form-field appearance="outline">
+                        <mat-label>Adjuster</mat-label>
+                        <mat-select [(ngModel)]="adjusterId">
+                          @for (adjuster of adjusters(); track adjuster.id) {
+                            <mat-option [value]="adjuster.id">{{ adjuster.fullName }}</mat-option>
+                          }
+                        </mat-select>
+                      </mat-form-field>
+                    } @else {
+                      <p>Assign this claim to yourself and start the review?</p>
+                    }
+                  }
+                  @case ('approve') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>Approved amount</mat-label>
+                      <input matInput type="number" min="0.01" step="0.01" [max]="c.claimedAmount"
+                             [(ngModel)]="approvedAmount" />
+                      <mat-hint>Up to {{ c.claimedAmount | number: '1.2-2' }}</mat-hint>
+                    </mat-form-field>
+                  }
+                  @case ('reject') {
+                    <mat-form-field appearance="outline">
+                      <mat-label>Reason</mat-label>
+                      <textarea matInput rows="3" maxlength="1000" [(ngModel)]="reason"></textarea>
+                    </mat-form-field>
+                  }
+                }
+                @if (action !== 'reject') {
+                  <mat-form-field appearance="outline">
+                    <mat-label>Comment (optional)</mat-label>
+                    <textarea matInput rows="2" maxlength="1000" [(ngModel)]="comment"></textarea>
+                  </mat-form-field>
+                }
+                <div class="form-actions">
+                  <button mat-button type="button" (click)="cancelAction()">Cancel</button>
+                  <button mat-flat-button type="button" [disabled]="busy() || !canConfirm()"
+                          (click)="confirmAction()">
+                    Confirm {{ labels[action].toLowerCase() }}
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div class="action-buttons">
+                @for (action of actions(); track action) {
+                  <button mat-stroked-button type="button" (click)="startAction(action)">
+                    {{ labels[action] }}
+                  </button>
+                }
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
+
+      <mat-card>
+        <mat-card-header><mat-card-title>History</mat-card-title></mat-card-header>
+        <mat-card-content>
+          <ol class="timeline">
+            @for (entry of history(); track entry.id) {
+              <li>
+                <app-status-chip [status]="entry.toStatus" />
+                <div class="meta">{{ entry.changedByName }} · {{ entry.changedAt | date: 'short' }}</div>
+                @if (entry.comment) {
+                  <div class="comment">{{ entry.comment }}</div>
+                }
+              </li>
+            }
+          </ol>
+        </mat-card-content>
+      </mat-card>
+    </div>
+  </div>
+}
