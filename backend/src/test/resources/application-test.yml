@@ -25,3 +25,6 @@ app:
     partitions: 1
   outbox:
     poll-interval-ms: 200
+  storage:
+    local:
+      root: ${java.io.tmpdir}/claimsphere-test-uploads

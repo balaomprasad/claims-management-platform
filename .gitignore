@@ -5,6 +5,7 @@ k8s/secrets.env
 
 # Java / Maven
 backend/target/
+backend/data/
 *.class
 *.log
 
