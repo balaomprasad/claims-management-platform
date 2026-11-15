@@ -9,3 +9,6 @@ data:
   CORS_ALLOWED_ORIGINS: http://claimsphere.local
   KAFKA_TOPIC_PARTITIONS: "3"
   KAFKA_TOPIC_REPLICAS: "1"
+  STORAGE_DIR: /data/uploads
+  # Structured JSON (ECS) console logs for log aggregation.
+  LOG_FORMAT: ecs

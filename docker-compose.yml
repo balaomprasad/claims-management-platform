@@ -49,12 +49,20 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
-      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-}
-      DEMO_ADJUSTER_PASSWORD: ${DEMO_ADJUSTER_PASSWORD:-}
-      DEMO_CLAIMANT_PASSWORD: ${DEMO_CLAIMANT_PASSWORD:-}
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:4200}
+      STORAGE_DIR: /data/uploads
     ports:
       - "8080:8080"
+    volumes:
+      - uploads-data:/data/uploads
+    healthcheck:
+      # The JRE image has no curl; bash's /dev/tcp confirms the HTTP port accepts connections.
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/localhost/8080'"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,7 +76,9 @@ services:
     ports:
       - "4200:8080"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres-data:
+  uploads-data:

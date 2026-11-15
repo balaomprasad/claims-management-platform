@@ -8,11 +8,14 @@ resources:
   - configmap.yaml
   - postgres.yaml
   - kafka.yaml
-  - backend.yaml
-  - frontend.yaml
+  - backend-storage.yaml
+  - backend-deployment.yaml
+  - backend-service.yaml
+  - frontend-deployment.yaml
+  - frontend-service.yaml
   - ingress.yaml
 
-# Secrets are generated from a git-ignored file: cp secrets.env.example secrets.env, then edit values.
+# Secrets come from a git-ignored file: cp secrets.env.example secrets.env, then replace every value.
 secretGenerator:
   - name: claimsphere-secrets
     envs:

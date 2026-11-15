@@ -1,23 +1,11 @@
-apiVersion: v1
-kind: Service
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: frontend
   labels:
     app: frontend
 spec:
-  selector:
-    app: frontend
-  ports:
-    - name: http
-      port: 80
-      targetPort: 8080
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: frontend
-spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: frontend
@@ -43,11 +31,17 @@ spec:
               path: /
               port: 8080
             periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            periodSeconds: 20
           resources:
             requests:
               cpu: 50m
               memory: 64Mi
             limits:
+              cpu: 250m
               memory: 128Mi
           securityContext:
             allowPrivilegeEscalation: false

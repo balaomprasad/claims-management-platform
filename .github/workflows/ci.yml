@@ -70,7 +70,9 @@ jobs:
         run: docker build -t claimsphere-backend:${{ github.sha }} backend
       - name: Build frontend image
         run: docker build -t claimsphere-frontend:${{ github.sha }} frontend
-      - name: Render Kubernetes manifests
+      - name: Render and validate Kubernetes manifests
         run: |
-          cp k8s/secrets.env.example k8s/secrets.env
-          kubectl kustomize k8s > /dev/null
+          cp infrastructure/kubernetes/secrets.env.example infrastructure/kubernetes/secrets.env
+          kubectl kustomize infrastructure/kubernetes > rendered.yaml
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz
+          ./kubeconform -strict -summary -kubernetes-version 1.30.0 rendered.yaml
